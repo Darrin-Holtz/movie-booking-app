@@ -22,6 +22,8 @@ type FeaturedMovie = {
   vote_average: number;
 };
 
+const FEATURED_MOVIES_LIMIT = 8;
+
 const genreLabels: Record<number, string> = {
   28: "Action",
   12: "Adventure",
@@ -61,7 +63,7 @@ const getFeaturedMovies = async (): Promise<FeaturedMovie[]> => {
   }
 
   return Promise.all(
-    data.results.slice(0, 4).map(async (movie: TmdbMovie) => {
+    data.results.slice(0, FEATURED_MOVIES_LIMIT).map(async (movie: TmdbMovie) => {
       const detailsRes = await fetch(
         `https://api.themoviedb.org/3/movie/${movie.id}?api_key=${process.env.TMDB_API_KEY}`,
         { cache: "no-store" }

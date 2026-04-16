@@ -1,6 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { StarIcon } from "lucide-react";
+import timeFormat from "@/lib/timeFormat";
 
 interface Movie {
   _id: string;
@@ -17,6 +18,8 @@ interface MovieCardProps {
 }
 
 const MovieCard = ({ movie }: MovieCardProps) => {
+  const formattedRuntime = timeFormat(movie.runtime);
+
   return (
     <div className="flex flex-col justify-between p-3 bg-gray-800 rounded-2xl hover:-translate-y-1 transition duration-300 w-66">
       <Link href={`/movies/${movie._id}`}>
@@ -31,7 +34,7 @@ const MovieCard = ({ movie }: MovieCardProps) => {
       <p className="mt-2 truncate font-semibold">{movie.title}</p>
       <p className="mt-2 text-sm text-gray-400">
         {new Date(movie.release_date).getFullYear()} • {movie.genres.slice(0, 2).join(" | ")}
-        {movie.runtime ? ` • ${movie.runtime} mins` : ""}
+        {formattedRuntime ? ` • ${formattedRuntime}` : ""}
       </p>
       <div className="flex items-center justify-between mt-4 pb-3">
         <Link

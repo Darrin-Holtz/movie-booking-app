@@ -1,7 +1,43 @@
+const TMDB_BASE_URL = "https://api.themoviedb.org/3";
+
+type TmdbMovie = {
+  id: number;
+  title: string;
+  backdrop_path: string | null;
+  poster_path?: string | null;
+  release_date: string;
+  genre_ids?: number[];
+  vote_average: number;
+  overview?: string;
+  runtime?: number;
+};
+
+type TmdbVideo = {
+  key: string;
+  site: string;
+  type: string;
+  official?: boolean;
+};
+
+export type TrailerItem = {
+  id: string;
+  title: string;
+  videoUrl: string;
+  image: string;
+};
+
+const getYoutubeTrailer = (videos: TmdbVideo[]): TmdbVideo | undefined => {
+  return (
+    videos.find((video) => video.site === "YouTube" && video.type === "Trailer" && video.official) ??
+    videos.find((video) => video.site === "YouTube" && video.type === "Trailer") ??
+    videos.find((video) => video.site === "YouTube" && video.type === "Teaser")
+  );
+};
+
 export async function getHeroMovie() {
   const res = await fetch(
-    `https://api.themoviedb.org/3/movie/popular?api_key=${process.env.TMDB_API_KEY}`,
-    { cache: "no-store" } // optional for fresh data
+    `${TMDB_BASE_URL}/movie/popular?api_key=${process.env.TMDB_API_KEY}`,
+    { cache: "no-store" }
   );
 
   if (!res.ok) {
@@ -14,9 +50,9 @@ export async function getHeroMovie() {
     return null;
   }
 
-  const heroMovie = data.results[0];
+  const heroMovie = data.results[0] as TmdbMovie;
   const detailsRes = await fetch(
-    `https://api.themoviedb.org/3/movie/${heroMovie.id}?api_key=${process.env.TMDB_API_KEY}`,
+    `${TMDB_BASE_URL}/movie/${heroMovie.id}?api_key=${process.env.TMDB_API_KEY}`,
     { cache: "no-store" }
   );
 
@@ -30,4 +66,54 @@ export async function getHeroMovie() {
     ...heroMovie,
     runtime: details.runtime,
   };
+}
+
+export async function getPopularTrailers(limit = 4): Promise<TrailerItem[]> {
+  const res = await fetch(
+    `${TMDB_BASE_URL}/movie/popular?api_key=${process.env.TMDB_API_KEY}`,
+    { cache: "no-store" }
+  );
+
+  if (!res.ok) {
+    return [];
+  }
+
+  const data = await res.json();
+
+  if (!Array.isArray(data.results)) {
+    return [];
+  }
+
+  const trailers = await Promise.all(
+    (data.results as TmdbMovie[]).slice(0, 12).map(async (movie) => {
+      const videosRes = await fetch(
+        `${TMDB_BASE_URL}/movie/${movie.id}/videos?api_key=${process.env.TMDB_API_KEY}`,
+        { cache: "no-store" }
+      );
+
+      if (!videosRes.ok) {
+        return null;
+      }
+
+      const videosData = await videosRes.json();
+      const trailer = getYoutubeTrailer(Array.isArray(videosData.results) ? videosData.results : []);
+
+      if (!trailer?.key) {
+        return null;
+      }
+
+      return {
+        id: String(movie.id),
+        title: movie.title,
+        videoUrl: `https://www.youtube.com/watch?v=${trailer.key}`,
+        image: movie.backdrop_path
+          ? `https://image.tmdb.org/t/p/w780${movie.backdrop_path}`
+          : movie.poster_path
+            ? `https://image.tmdb.org/t/p/w500${movie.poster_path}`
+            : "/next.svg",
+      } satisfies TrailerItem;
+    })
+  );
+
+  return trailers.filter((trailer): trailer is TrailerItem => trailer !== null).slice(0, limit);
 }
