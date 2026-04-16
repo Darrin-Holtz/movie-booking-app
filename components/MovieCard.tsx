@@ -4,11 +4,12 @@ import { StarIcon } from "lucide-react";
 import timeFormat from "@/lib/timeFormat";
 
 interface Movie {
-  _id: string;
-  backdrop_path: string;
+  id: number;
+  backdrop_path: string | null;
   title: string;
   release_date: string;
-  genres: string[];
+  genre_ids?: number[];
+  genre_names?: string[];
   runtime?: number;
   vote_average: number;
 }
@@ -22,9 +23,13 @@ const MovieCard = ({ movie }: MovieCardProps) => {
 
   return (
     <div className="flex flex-col justify-between p-3 bg-gray-800 rounded-2xl hover:-translate-y-1 transition duration-300 w-66">
-      <Link href={`/movies/${movie._id}`}>
+      <Link href={`/movies/${movie.id}`}>
         <Image
-          src={movie.backdrop_path}
+          src={movie.backdrop_path
+            ? movie.backdrop_path.startsWith("http")
+              ? movie.backdrop_path
+              : `https://image.tmdb.org/t/p/w780${movie.backdrop_path}`
+            : "/fallback-movie.jpg"}
           alt={movie.title}
           width={320}
           height={180}
@@ -33,12 +38,12 @@ const MovieCard = ({ movie }: MovieCardProps) => {
       </Link>
       <p className="mt-2 truncate font-semibold">{movie.title}</p>
       <p className="mt-2 text-sm text-gray-400">
-        {new Date(movie.release_date).getFullYear()} • {movie.genres.slice(0, 2).join(" | ")}
+        {new Date(movie.release_date).getFullYear()}{movie.genre_names && movie.genre_names.length > 0 ? ` • ${movie.genre_names.slice(0, 2).join(" | ")}` : ""}
         {formattedRuntime ? ` • ${formattedRuntime}` : ""}
       </p>
       <div className="flex items-center justify-between mt-4 pb-3">
         <Link
-          href={`/movies/${movie._id}`}
+          href={`/movies/${movie.id}`}
           className="mt-4 rounded-full bg-red-800 px-4 py-2 text-xs font-medium text-white transition hover:bg-red-500 cursor-pointer"
         >
           Buy Tickets

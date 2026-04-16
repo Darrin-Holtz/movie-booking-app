@@ -7,6 +7,7 @@ type TmdbMovie = {
   poster_path?: string | null;
   release_date: string;
   genre_ids?: number[];
+  genre_names?: string[];
   vote_average: number;
   overview?: string;
   runtime?: number;
@@ -66,6 +67,38 @@ export async function getHeroMovie() {
     ...heroMovie,
     runtime: details.runtime,
   };
+}
+
+async function getGenreMap(): Promise<Record<number, string>> {
+  const res = await fetch(
+    `${TMDB_BASE_URL}/genre/movie/list?api_key=${process.env.TMDB_API_KEY}`,
+    { next: { revalidate: 86400 } }
+  );
+  if (!res.ok) return {};
+  const data = await res.json();
+  return Object.fromEntries(
+    (data.genres as { id: number; name: string }[]).map((g) => [g.id, g.name])
+  );
+}
+
+export async function getPopularMovies(): Promise<TmdbMovie[]> {
+  const [moviesRes, genreMap] = await Promise.all([
+    fetch(
+      `${TMDB_BASE_URL}/movie/popular?api_key=${process.env.TMDB_API_KEY}`,
+      { cache: "no-store" }
+    ),
+    getGenreMap(),
+  ]);
+
+  if (!moviesRes.ok) return [];
+
+  const data = await moviesRes.json();
+  if (!Array.isArray(data.results)) return [];
+
+  return (data.results as TmdbMovie[]).map((movie) => ({
+    ...movie,
+    genre_names: (movie.genre_ids ?? []).map((id) => genreMap[id]).filter(Boolean),
+  }));
 }
 
 export async function getPopularTrailers(limit = 4): Promise<TrailerItem[]> {

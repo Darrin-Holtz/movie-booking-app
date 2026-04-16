@@ -13,16 +13,16 @@ type TmdbMovie = {
 };
 
 type FeaturedMovie = {
-  _id: string;
-  backdrop_path: string;
+  id: number;
+  backdrop_path: string | null;
   title: string;
   release_date: string;
-  genres: string[];
+  genre_names?: string[];
   runtime?: number;
   vote_average: number;
 };
 
-const FEATURED_MOVIES_LIMIT = 8;
+const FEATURED_MOVIES_LIMIT = 10;
 
 const genreLabels: Record<number, string> = {
   28: "Action",
@@ -77,13 +77,13 @@ const getFeaturedMovies = async (): Promise<FeaturedMovie[]> => {
       }
 
       return {
-        _id: String(movie.id),
+        id: movie.id,
         backdrop_path: movie.backdrop_path
           ? `https://image.tmdb.org/t/p/w780${movie.backdrop_path}`
-          : "/fallback-movie.jpg",
+          : null,
         title: movie.title,
         release_date: movie.release_date,
-        genres: movie.genre_ids?.map((genreId) => genreLabels[genreId] ?? String(genreId)) ?? [],
+        genre_names: movie.genre_ids?.map((genreId) => genreLabels[genreId] ?? String(genreId)) ?? [],
         runtime,
         vote_average: movie.vote_average,
       };
@@ -108,7 +108,7 @@ const FeaturedSection = async () => {
       {featuredMovies.length > 0 ? (
         <div className="flex flex-wrap max-sm:justify-center gap-8 mt-8">
           {featuredMovies.map((movie: FeaturedMovie) => (
-            <MovieCard key={movie._id} movie={movie} />
+            <MovieCard key={movie.id} movie={movie} />
           ))}
         </div>
       ) : (

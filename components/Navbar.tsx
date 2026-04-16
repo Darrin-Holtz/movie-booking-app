@@ -98,7 +98,7 @@ const Navbar = () => {
                 <Link onClick={handleNavClick} href="/movies">
                     Movies
                 </Link>
-                <Link onClick={handleNavClick} href="/favorites">
+                <Link onClick={handleNavClick} href="/favorite">
                     Favorites
                 </Link>
                 <Link onClick={handleNavClick} href="/theaters">
