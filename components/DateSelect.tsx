@@ -2,12 +2,22 @@ import { ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
 import BlurCircle from "./BlurCircle";
 import { useMemo, useState } from "react";
 import toast from "react-hot-toast";
+import { useRouter } from "next/navigation";
 
 type DateSelectProps = {
   dateTime: Date;
+  movieId: string;
 };
 
-const DateSelect = ({ dateTime }: DateSelectProps) => {
+const formatDateParam = (date: Date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+
+  return `${month}-${day}-${year}`;
+};
+
+const DateSelect = ({ dateTime, movieId }: DateSelectProps) => {
   const [offset, setOffset] = useState(0);
   const [selected, setSelected] = useState<Date | null>(null);
 
@@ -19,11 +29,16 @@ const DateSelect = ({ dateTime }: DateSelectProps) => {
     });
   }, [dateTime, offset]);
 
+  const router = useRouter();
+
   const handleBookNow = () => {
     if (!selected) {
       toast.error("You must select a date");
       return;
     }
+
+    router.push(`/movies/${movieId}/${formatDateParam(selected)}`)
+    scrollTo(0,0)
   };
 
   return (

@@ -20,6 +20,20 @@ const genreLabels: Record<number, string> = {
   37: "Western",
 };
 
+const toVoteAverage = (value: unknown) => {
+  return typeof value === "number" && Number.isFinite(value) ? value : 0;
+};
+
+const normalizeRecommendedMovie = (movie: Record<string, unknown>) => ({
+  ...movie,
+  vote_average: toVoteAverage(movie.vote_average),
+  genre_names: Array.isArray(movie.genre_ids)
+    ? movie.genre_ids
+        .map((genreId) => (typeof genreId === "number" ? genreLabels[genreId] : undefined))
+        .filter(Boolean)
+    : [],
+});
+
 export async function GET(
   _req: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -30,14 +44,28 @@ export async function GET(
   );
   const data = await res.json();
 
-  if (Array.isArray(data.recommendations?.results)) {
-    data.recommendations.results = data.recommendations.results.map(
-      (movie: { genre_ids?: number[] }) => ({
-        ...movie,
-        genre_names: movie.genre_ids?.map((genreId) => genreLabels[genreId]).filter(Boolean) ?? [],
-      })
+  if (!res.ok) {
+    return Response.json(
+      { error: data.status_message ?? "Failed to fetch movie details." },
+      { status: res.status }
     );
   }
+
+  if (Array.isArray(data.recommendations?.results)) {
+    data.recommendations.results = data.recommendations.results.map(
+      (movie: Record<string, unknown>) => normalizeRecommendedMovie(movie)
+    );
+  }
+
+  data.vote_average = toVoteAverage(data.vote_average);
+  data.genres = Array.isArray(data.genres) ? data.genres : [];
+  data.release_date = typeof data.release_date === "string" ? data.release_date : "";
+  data.overview = typeof data.overview === "string" ? data.overview : "";
+  data.runtime = typeof data.runtime === "number" && Number.isFinite(data.runtime) ? data.runtime : null;
+  data.credits = {
+    ...data.credits,
+    cast: Array.isArray(data.credits?.cast) ? data.credits.cast : [],
+  };
 
   return Response.json(data);
 }
