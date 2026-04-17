@@ -7,6 +7,8 @@ import BlurCircle from "@/components/BlurCircle"
 import { StarIcon, HeartIcon, PlayCircleIcon } from "lucide-react"
 import timeFormat from "@/lib/timeFormat"
 import Link from "next/link"
+import DateSelect from "@/components/DateSelect"
+import MovieCard from "@/components/MovieCard"
 
 type ShowState = {
     movie: any,
@@ -14,7 +16,18 @@ type ShowState = {
 }
 
 const MovieDetails = () => {
-    const {id} = useParams() 
+    const params = useParams()
+    const rawId = params.id
+    const id = Array.isArray(rawId) ? rawId[0] : rawId
+    
+    if (!id) {
+        return (
+            <div className="flex flex-col items-center justify-center h-screen">
+            <h1 className="text-3xl font-bold text-center">Invalid movie id.</h1>
+            </div>
+        )
+    }
+
     const [show, setShow] = useState<ShowState | null>(null)
     const getShow = async () => {
         try {
@@ -34,6 +47,8 @@ const MovieDetails = () => {
     useEffect(() => {
         getShow()
     }, [id])
+
+    const recommendedMovies = (show?.movie.recommendations?.results ?? []) as any[]
 
     return show ? (
         <div className="px-6 md:px-16 lg:px-40 pt-30 md:pt-50">
@@ -92,6 +107,13 @@ const MovieDetails = () => {
                     </div>
                 </div>
             )}
+            <DateSelect dateTime={show.dateTime} />
+            <h3 className="text-lg font-medium mt-20 mb-8">You May Also Like</h3>
+            <div className="flex flex-wrap max-sm:justify-center gap-8">
+                {recommendedMovies.slice(0, 4).map((movie: any) => (
+                    <MovieCard key={movie.id} movie={movie} />
+                ))}
+            </div>
         </div>
     ) : (
         <div className="flex flex-col items-center justify-center h-screen">
