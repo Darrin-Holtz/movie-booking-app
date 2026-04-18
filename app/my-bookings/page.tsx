@@ -77,7 +77,7 @@ export default function MyBookingsPage() {
     api.showSessions.getMyBookings,
     session?.session ? {} : "skip"
   ) as Booking[] | undefined;
-  const [now, setNow] = useState(Date.now());
+  const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
     const intervalId = window.setInterval(() => {

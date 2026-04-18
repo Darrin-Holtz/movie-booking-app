@@ -2,6 +2,28 @@ import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
 
 export default defineSchema({
+  favorites: defineTable({
+    userId: v.string(),
+    movieId: v.string(),
+    movieTitle: v.string(),
+    posterPath: v.optional(v.string()),
+    backdropPath: v.optional(v.string()),
+    releaseDate: v.optional(v.string()),
+    voteAverage: v.optional(v.number()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("userId", ["userId"])
+    .index("userId_movieId", ["userId", "movieId"]),
+
+  userProfiles: defineTable({
+    userId: v.string(),
+    avatarStorageId: v.optional(v.id("_storage")),
+    avatarUrl: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  }).index("userId", ["userId"]),
+
   showSessions: defineTable({
     movieId: v.string(),
     movieTitle: v.string(),

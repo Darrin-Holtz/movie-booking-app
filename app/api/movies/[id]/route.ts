@@ -34,13 +34,24 @@ const normalizeRecommendedMovie = (movie: Record<string, unknown>) => ({
     : [],
 });
 
+const getYoutubeTrailer = (videos: Record<string, unknown>[]) => {
+  return (
+    videos.find(
+      (video) =>
+        video.site === "YouTube" && video.type === "Trailer" && video.official === true
+    ) ??
+    videos.find((video) => video.site === "YouTube" && video.type === "Trailer") ??
+    videos.find((video) => video.site === "YouTube" && video.type === "Teaser")
+  );
+};
+
 export async function GET(
   _req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
   const res = await fetch(
-    `https://api.themoviedb.org/3/movie/${id}?api_key=${process.env.TMDB_API_KEY}&append_to_response=credits,recommendations`
+    `https://api.themoviedb.org/3/movie/${id}?api_key=${process.env.TMDB_API_KEY}&append_to_response=credits,recommendations,videos`
   );
   const data = await res.json();
 
@@ -66,6 +77,17 @@ export async function GET(
     ...data.credits,
     cast: Array.isArray(data.credits?.cast) ? data.credits.cast : [],
   };
+
+  const trailer = Array.isArray(data.videos?.results)
+    ? getYoutubeTrailer(data.videos.results)
+    : null;
+
+  data.trailerUrl =
+    typeof trailer?.key === "string"
+      ? `https://www.youtube.com/watch?v=${trailer.key}`
+      : null;
+
+  delete data.videos;
 
   return Response.json(data);
 }

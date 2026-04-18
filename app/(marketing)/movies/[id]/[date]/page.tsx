@@ -4,7 +4,7 @@ import { useMutation, useQuery } from "convex/react";
 import { ArrowRightIcon, CalendarDaysIcon, Clock3Icon, StarIcon } from "lucide-react";
 import Image from "next/image";
 import { useParams, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
 import BlurCircle from "@/components/BlurCircle";
 import Loading from "@/components/Loading";
@@ -188,7 +188,10 @@ export default function SeatLayoutPage() {
   const selectedSession = sessionAvailability?.find(
     (session) => session.time === selectedTime
   );
-  const currentUserHeldSeatLabels = selectedSession?.currentUserHeldSeats ?? [];
+  const currentUserHeldSeatLabels = useMemo(
+    () => selectedSession?.currentUserHeldSeats ?? [],
+    [selectedSession]
+  );
   const currentUserHoldExpiresAt =
     selectedSession?.currentUserHoldExpiresAt ?? null;
 
