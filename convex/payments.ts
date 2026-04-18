@@ -5,6 +5,7 @@ import { internal } from "./_generated/api";
 import { Doc, Id } from "./_generated/dataModel";
 import {
   httpAction,
+  internalAction,
   internalMutation,
   mutation,
   query,
@@ -13,6 +14,17 @@ import {
 import { authComponent } from "./auth";
 
 const PAYMENT_HOLD_DURATION_MS = 15 * 60 * 1000;
+const STRIPE_RECONCILIATION_DELAYS_MS = [60 * 1000, 5 * 60 * 1000, 14 * 60 * 1000];
+
+type StripeReconciliationResult =
+  | { status: "completed" }
+  | { status: "failed"; reason: string }
+  | { status: "expired" }
+  | { status: "ignored" }
+  | { status: "missing" }
+  | { status: "pending"; paymentStatus: string; checkoutStatus: string | null }
+  | { status: "missing_config" }
+  | { status: "error" };
 
 const isReservationHeldByUser = (
   reservation: Doc<"seatReservations">,
@@ -38,6 +50,64 @@ const patchCheckoutStatus = async (
     updatedAt: Date.now(),
     ...extras,
   });
+};
+
+const finalizeCheckout = async (
+  ctx: MutationCtx,
+  checkout: Doc<"paymentCheckouts">,
+  stripeCheckoutSessionId: string,
+  stripePaymentIntentId?: string
+) => {
+  if (checkout.status === "completed") {
+    return { status: "completed" as const };
+  }
+
+  const now = Date.now();
+
+  for (const item of checkout.items) {
+    const reservations = await ctx.db
+      .query("seatReservations")
+      .withIndex("sessionId", (query) => query.eq("sessionId", item.sessionId))
+      .collect();
+
+    const relevantReservations = reservations.filter(
+      (reservation) =>
+        reservation.reservedByUserId === checkout.userId &&
+        item.seatLabels.includes(reservation.seatLabel)
+    );
+
+    if (relevantReservations.length !== item.seatLabels.length) {
+      await patchCheckoutStatus(ctx, checkout._id, "failed");
+      return { status: "failed" as const, reason: "missing_reservations" };
+    }
+
+    const hasExpiredHold = relevantReservations.some(
+      (reservation) =>
+        reservation.status === "held" &&
+        (reservation.holdExpiresAt === undefined || reservation.holdExpiresAt <= now)
+    );
+
+    if (hasExpiredHold) {
+      await patchCheckoutStatus(ctx, checkout._id, "failed");
+      return { status: "failed" as const, reason: "expired_hold" };
+    }
+
+    for (const reservation of relevantReservations) {
+      if (reservation.status !== "confirmed") {
+        await ctx.db.patch(reservation._id, {
+          status: "confirmed",
+        });
+      }
+    }
+  }
+
+  await patchCheckoutStatus(ctx, checkout._id, "completed", {
+    completedAt: now,
+    stripeCheckoutSessionId,
+    stripePaymentIntentId,
+  });
+
+  return { status: "completed" as const };
 };
 
 export const prepareCheckout = mutation({
@@ -170,6 +240,13 @@ export const attachStripeCheckoutSession = mutation({
       updatedAt: Date.now(),
     });
 
+    for (const delayMs of STRIPE_RECONCILIATION_DELAYS_MS) {
+      await ctx.scheduler.runAfter(delayMs, internal.payments.reconcileStripeCheckout, {
+        checkoutId: args.checkoutId,
+        stripeCheckoutSessionId: args.stripeCheckoutSessionId,
+      });
+    }
+
     return { ok: true };
   },
 });
@@ -200,6 +277,45 @@ export const getMyCheckoutByStripeSessionId = query({
   },
 });
 
+export const confirmPaidCheckout = mutation({
+  args: {
+    checkoutId: v.optional(v.id("paymentCheckouts")),
+    stripeCheckoutSessionId: v.string(),
+    stripePaymentIntentId: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const user = await authComponent.safeGetAuthUser(ctx);
+
+    if (!user) {
+      throw new Error("You must be signed in to confirm checkout.");
+    }
+
+    const checkout = args.checkoutId
+      ? await ctx.db.get(args.checkoutId)
+      : await ctx.db
+          .query("paymentCheckouts")
+          .withIndex("stripeCheckoutSessionId", (query) =>
+            query.eq("stripeCheckoutSessionId", args.stripeCheckoutSessionId)
+          )
+          .unique();
+
+    if (!checkout || checkout.userId !== user._id) {
+      throw new Error("Checkout session not found.");
+    }
+
+    if (checkout.status === "expired" || checkout.status === "failed") {
+      return { status: checkout.status };
+    }
+
+    return finalizeCheckout(
+      ctx,
+      checkout,
+      args.stripeCheckoutSessionId,
+      args.stripePaymentIntentId
+    );
+  },
+});
+
 export const completeStripeCheckout = internalMutation({
   args: {
     checkoutId: v.optional(v.id("paymentCheckouts")),
@@ -220,56 +336,12 @@ export const completeStripeCheckout = internalMutation({
       return { status: "missing" as const };
     }
 
-    if (checkout.status === "completed") {
-      return { status: "completed" as const };
-    }
-
-    const now = Date.now();
-
-    for (const item of checkout.items) {
-      const reservations = await ctx.db
-        .query("seatReservations")
-        .withIndex("sessionId", (query) => query.eq("sessionId", item.sessionId))
-        .collect();
-
-      const relevantReservations = reservations.filter(
-        (reservation) =>
-          reservation.reservedByUserId === checkout.userId &&
-          item.seatLabels.includes(reservation.seatLabel)
-      );
-
-      if (relevantReservations.length !== item.seatLabels.length) {
-        await patchCheckoutStatus(ctx, checkout._id, "failed");
-        return { status: "failed" as const, reason: "missing_reservations" };
-      }
-
-      const hasExpiredHold = relevantReservations.some(
-        (reservation) =>
-          reservation.status === "held" &&
-          (reservation.holdExpiresAt === undefined || reservation.holdExpiresAt <= now)
-      );
-
-      if (hasExpiredHold) {
-        await patchCheckoutStatus(ctx, checkout._id, "failed");
-        return { status: "failed" as const, reason: "expired_hold" };
-      }
-
-      for (const reservation of relevantReservations) {
-        if (reservation.status !== "confirmed") {
-          await ctx.db.patch(reservation._id, {
-            status: "confirmed",
-          });
-        }
-      }
-    }
-
-    await patchCheckoutStatus(ctx, checkout._id, "completed", {
-      completedAt: now,
-      stripeCheckoutSessionId: args.stripeCheckoutSessionId,
-      stripePaymentIntentId: args.stripePaymentIntentId,
-    });
-
-    return { status: "completed" as const };
+    return finalizeCheckout(
+      ctx,
+      checkout,
+      args.stripeCheckoutSessionId,
+      args.stripePaymentIntentId
+    );
   },
 });
 
@@ -294,11 +366,60 @@ export const expireStripeCheckout = internalMutation({
   },
 });
 
+export const reconcileStripeCheckout: ReturnType<typeof internalAction> = internalAction({
+  args: {
+    checkoutId: v.id("paymentCheckouts"),
+    stripeCheckoutSessionId: v.string(),
+  },
+  handler: async (ctx, args): Promise<StripeReconciliationResult> => {
+    const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
+
+    if (!stripeSecretKey) {
+      console.error("Missing STRIPE_SECRET_KEY for Stripe reconciliation.");
+      return { status: "missing_config" as const };
+    }
+
+    try {
+      const stripe = new Stripe(stripeSecretKey);
+      const session = await stripe.checkout.sessions.retrieve(
+        args.stripeCheckoutSessionId
+      );
+
+      if (session.payment_status === "paid" && session.status === "complete") {
+        return await ctx.runMutation(internal.payments.completeStripeCheckout, {
+          checkoutId: args.checkoutId,
+          stripeCheckoutSessionId: session.id,
+          stripePaymentIntentId:
+            typeof session.payment_intent === "string"
+              ? session.payment_intent
+              : undefined,
+        });
+      }
+
+      if (session.status === "expired") {
+        return await ctx.runMutation(internal.payments.expireStripeCheckout, {
+          stripeCheckoutSessionId: session.id,
+        });
+      }
+
+      return {
+        status: "pending" as const,
+        paymentStatus: session.payment_status,
+        checkoutStatus: session.status,
+      };
+    } catch (error) {
+      console.error("Stripe reconciliation failed.", error);
+      return { status: "error" as const };
+    }
+  },
+});
+
 export const stripeWebhook = httpAction(async (ctx, request) => {
   const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
   if (!stripeSecretKey || !webhookSecret) {
+    console.error("Stripe webhook invoked without complete Stripe configuration.");
     return new Response("Stripe is not configured.", { status: 500 });
   }
 
@@ -314,10 +435,13 @@ export const stripeWebhook = httpAction(async (ctx, request) => {
   let event: Stripe.Event;
 
   try {
-    event = stripe.webhooks.constructEvent(payload, signature, webhookSecret);
-  } catch {
+    event = await stripe.webhooks.constructEventAsync(payload, signature, webhookSecret);
+  } catch (error) {
+    console.error("Invalid Stripe webhook signature.", error);
     return new Response("Invalid Stripe signature.", { status: 400 });
   }
+
+  console.info(`Received Stripe webhook event ${event.type}.`);
 
   if (event.type === "checkout.session.completed") {
     const session = event.data.object as Stripe.Checkout.Session;

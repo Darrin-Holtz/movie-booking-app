@@ -33,7 +33,8 @@ STRIPE_WEBHOOK_SECRET=whsec_...
 ```
 
 `NEXT_PUBLIC_APP_URL` is optional locally, but it is used for canonical metadata and share previews.
-`STRIPE_WEBHOOK_SECRET` should match the webhook you configure to point at your Convex deployment's `/stripe/webhook` endpoint.
+`STRIPE_WEBHOOK_SECRET` should match the signing secret for the specific Stripe webhook endpoint that points at your Convex deployment's `/stripe/webhook` endpoint.
+Because the webhook handler runs in Convex, `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET` must also be set in the active Convex deployment with `npx convex env set`.
 
 ## Commands
 

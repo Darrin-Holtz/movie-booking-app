@@ -3,7 +3,7 @@
 import { useQuery } from "convex/react";
 import { CheckCircle2Icon, Clock3Icon, TicketPlusIcon } from "lucide-react";
 import Link from "next/link";
-import { useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Loading from "@/components/Loading";
 import { api } from "@/convex/_generated/api";
@@ -16,10 +16,47 @@ export default function CheckoutSuccessPage() {
   const { data: session, isPending } = authClient.useSession();
   const searchParams = useSearchParams();
   const sessionId = searchParams.get("session_id") ?? "";
+  const recoveryAttemptedForSession = useRef<string | null>(null);
+  const [recoveryError, setRecoveryError] = useState<string | null>(null);
   const checkout = useQuery(
     api.payments.getMyCheckoutByStripeSessionId,
     session?.session && sessionId ? { stripeCheckoutSessionId: sessionId } : "skip"
   );
+
+  useEffect(() => {
+    if (!session?.session || !sessionId || !checkout || checkout.status !== "pending") {
+      return;
+    }
+
+    if (recoveryAttemptedForSession.current === sessionId) {
+      return;
+    }
+
+    recoveryAttemptedForSession.current = sessionId;
+
+    void fetch("/api/payments/confirm", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ sessionId }),
+    })
+      .then(async (response) => {
+        if (response.ok) {
+          setRecoveryError(null);
+          return;
+        }
+
+        const data = (await response.json().catch(() => null)) as
+          | { error?: string }
+          | null;
+
+        setRecoveryError(data?.error ?? "Unable to confirm payment status.");
+      })
+      .catch(() => {
+        setRecoveryError("Unable to confirm payment status.");
+      });
+  }, [checkout, session?.session, sessionId]);
 
   useEffect(() => {
     if (checkout?.status === "completed") {
@@ -84,6 +121,9 @@ export default function CheckoutSuccessPage() {
               ? "Stripe reported a successful payment and your held seats have been converted into confirmed tickets."
               : "Stripe redirected back successfully, but the booking confirmation webhook is still processing. This page will update once Convex receives it."}
           </p>
+          {!isCompleted && recoveryError ? (
+            <p className="mt-4 max-w-2xl text-sm text-amber-200/85">{recoveryError}</p>
+          ) : null}
         </section>
 
         <section className="rounded-3xl border border-white/10 bg-white/5 p-6 shadow-xl shadow-black/25 backdrop-blur-xl">
