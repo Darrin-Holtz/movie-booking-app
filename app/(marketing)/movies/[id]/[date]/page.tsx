@@ -10,6 +10,7 @@ import BlurCircle from "@/components/BlurCircle";
 import Loading from "@/components/Loading";
 import { api } from "@/convex/_generated/api";
 import { authClient } from "@/lib/auth-client";
+import { trackEvent } from "@/lib/analytics";
 import { getShowtimePrice } from "@/lib/showtimePricing";
 import timeFormat from "@/lib/timeFormat";
 import Link from "next/link";
@@ -132,6 +133,11 @@ export default function SeatLayoutPage() {
           movie,
           date,
           times: DEFAULT_SHOWTIMES,
+        });
+        trackEvent("view_seat_selection", {
+          movie_id: movieId,
+          movie_title: movie.title,
+          show_date: date,
         });
         setSelectedTime(DEFAULT_SHOWTIMES[0]);
         setErrorMessage(null);
@@ -264,6 +270,10 @@ export default function SeatLayoutPage() {
     }
 
     if (!authSession?.session) {
+      trackEvent("seat_hold_auth_gate", {
+        movie_id: movieId,
+        show_date: date,
+      });
       toast.error("Sign in to place a 5-minute seat hold.");
       router.push("/sign-in");
       return;
@@ -291,6 +301,12 @@ export default function SeatLayoutPage() {
         time: selectedTime,
         seats: nextSelectedSeats,
       });
+      trackEvent("seat_hold_updated", {
+        movie_id: movieId,
+        show_date: date,
+        show_time: selectedTime,
+        seats_selected: nextSelectedSeats.length,
+      });
     } catch (error) {
       setSelectedSeats(previousSelectedSeats);
       toast.error(
@@ -302,6 +318,10 @@ export default function SeatLayoutPage() {
   };
 
   const handleSignInToHold = () => {
+    trackEvent("seat_hold_sign_in_click", {
+      movie_id: movieId,
+      show_date: date,
+    });
     router.push("/sign-in");
   };
 
@@ -374,7 +394,14 @@ export default function SeatLayoutPage() {
                 <button
                   key={time}
                   type="button"
-                  onClick={() => setSelectedTime(time)}
+                  onClick={() => {
+                    setSelectedTime(time);
+                    trackEvent("select_showtime", {
+                      movie_id: movieId,
+                      show_date: date,
+                      show_time: time,
+                    });
+                  }}
                   aria-pressed={selectedTime === time}
                   className={`cursor-pointer rounded-2xl border px-4 py-3 text-left text-sm font-medium transition-all duration-200 ${
                     selectedTime === time
@@ -545,7 +572,13 @@ export default function SeatLayoutPage() {
 
       <div className="flex justify-center">
         <Link
-          href="/my-bookings"
+          href="/checkout"
+          onClick={() => trackEvent("begin_checkout", {
+            movie_id: movieId,
+            show_date: date,
+            show_time: selectedTime,
+            seats_selected: selectedSeats.length,
+          })}
           className="flex items-center gap-1 mt-20 px-10 py-3 text-sm bg-red-700 hover:bg-red-500 transition rounded-full font-medium cursor-pointer active:scale-95"
         >
           Proceed to Checkout

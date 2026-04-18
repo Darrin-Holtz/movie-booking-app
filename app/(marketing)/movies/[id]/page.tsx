@@ -14,6 +14,7 @@ import DateSelect from "@/components/DateSelect"
 import MovieCard from "@/components/MovieCard"
 import { api } from "@/convex/_generated/api"
 import { authClient } from "@/lib/auth-client"
+import { trackEvent } from "@/lib/analytics"
 
 type MovieGenre = {
     id: number
@@ -120,6 +121,10 @@ const MovieDetails = () => {
                     movie: data,
                     dateTime: new Date()
                 })
+                trackEvent("view_movie_detail", {
+                    movie_id: id,
+                    movie_title: data.title,
+                })
                 setErrorMessage(null)
             } catch (error) {
                 console.error(error)
@@ -165,6 +170,10 @@ const MovieDetails = () => {
         }
 
         setIsTrailerOpen(true)
+        trackEvent("open_trailer", {
+            movie_id: id,
+            movie_title: show?.movie.title,
+        })
     }
 
     const handleFavoriteToggle = async () => {
@@ -183,6 +192,10 @@ const MovieDetails = () => {
         try {
             if (isFavorite) {
                 await removeFavorite({ movieId: id })
+                trackEvent("remove_favorite", {
+                    movie_id: id,
+                    movie_title: show.movie.title,
+                })
                 toast.success("Removed from favorites")
             } else {
                 await addFavorite({
@@ -192,6 +205,10 @@ const MovieDetails = () => {
                     backdropPath: show.movie.backdrop_path ?? undefined,
                     releaseDate: show.movie.release_date || undefined,
                     voteAverage: show.movie.vote_average,
+                })
+                trackEvent("add_favorite", {
+                    movie_id: id,
+                    movie_title: show.movie.title,
                 })
                 toast.success("Added to favorites")
             }
@@ -248,7 +265,7 @@ const MovieDetails = () => {
                                 <PlayCircleIcon className="w-5 h-5" />
                                 {trailerEmbedUrl ? "Watch Trailer" : "Trailer Unavailable"}
                             </button>
-                            <Link href="#dateSelect" className="px-10 py-3 text-sm bg-red-700 hover:bg-red-500 transition rounded-md font-medium cursor-pointer active:scale-95">Buy Tickets</Link>
+                            <Link href="#dateSelect" onClick={() => trackEvent("begin_ticket_selection", { movie_id: id, movie_title: show.movie.title })} className="px-10 py-3 text-sm bg-red-700 hover:bg-red-500 transition rounded-md font-medium cursor-pointer active:scale-95">Buy Tickets</Link>
                             <button
                                 className={`p-2.5 rounded-full transition cursor-pointer active:scale-95 disabled:cursor-not-allowed disabled:opacity-60 ${
                                     isFavorite

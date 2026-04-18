@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useState } from "react";
 import toast from "react-hot-toast";
 import { authClient } from "@/lib/auth-client";
+import { trackEvent } from "@/lib/analytics";
 
 export default function SignUpPage() {
   const router = useRouter();
@@ -25,6 +26,9 @@ export default function SignUpPage() {
     event.preventDefault();
 
     if (password !== confirmPassword) {
+      trackEvent("sign_up_error", {
+        message: "Passwords do not match",
+      });
       toast.error("Passwords do not match");
       return;
     }
@@ -36,16 +40,19 @@ export default function SignUpPage() {
       email,
       password,
       callbackURL: "/",
-      rememberMe: true,
     });
 
     setIsSubmitting(false);
 
     if (result.error) {
+      trackEvent("sign_up_error", {
+        message: result.error.message || "Unable to create account",
+      });
       toast.error(result.error.message || "Unable to create account");
       return;
     }
 
+    trackEvent("sign_up_success");
     toast.success("Account created");
     router.push("/");
     router.refresh();

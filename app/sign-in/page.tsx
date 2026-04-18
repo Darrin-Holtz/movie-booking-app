@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useState } from "react";
 import toast from "react-hot-toast";
 import { authClient } from "@/lib/auth-client";
+import { trackEvent } from "@/lib/analytics";
 
 export default function SignInPage() {
   const router = useRouter();
@@ -28,16 +29,19 @@ export default function SignInPage() {
       email,
       password,
       callbackURL: "/",
-      rememberMe: true,
     });
 
     setIsSubmitting(false);
 
     if (result.error) {
+      trackEvent("sign_in_error", {
+        message: result.error.message || "Unable to sign in",
+      });
       toast.error(result.error.message || "Unable to sign in");
       return;
     }
 
+    trackEvent("sign_in_success");
     toast.success("Signed in");
     router.push("/");
     router.refresh();

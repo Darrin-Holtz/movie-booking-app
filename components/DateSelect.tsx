@@ -3,6 +3,7 @@ import BlurCircle from "./BlurCircle";
 import { useMemo, useState } from "react";
 import toast from "react-hot-toast";
 import { useRouter } from "next/navigation";
+import { trackEvent } from "@/lib/analytics";
 
 type DateSelectProps = {
   dateTime: Date;
@@ -36,6 +37,11 @@ const DateSelect = ({ dateTime, movieId }: DateSelectProps) => {
       toast.error("You must select a date");
       return;
     }
+
+    trackEvent("select_show_date", {
+      movie_id: movieId,
+      selected_date: formatDateParam(selected),
+    });
 
     router.push(`/movies/${movieId}/${formatDateParam(selected)}`)
     scrollTo(0,0)

@@ -2,6 +2,40 @@ import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
 
 export default defineSchema({
+  paymentCheckouts: defineTable({
+    userId: v.string(),
+    stripeCheckoutSessionId: v.optional(v.string()),
+    stripePaymentIntentId: v.optional(v.string()),
+    status: v.union(
+      v.literal("pending"),
+      v.literal("completed"),
+      v.literal("expired"),
+      v.literal("failed")
+    ),
+    currency: v.string(),
+    seatCount: v.number(),
+    totalPrice: v.number(),
+    expiresAt: v.number(),
+    completedAt: v.optional(v.number()),
+    items: v.array(
+      v.object({
+        sessionId: v.id("showSessions"),
+        movieId: v.string(),
+        movieTitle: v.string(),
+        posterPath: v.optional(v.string()),
+        date: v.string(),
+        time: v.string(),
+        seatLabels: v.array(v.string()),
+        seatPrice: v.number(),
+        totalPrice: v.number(),
+      })
+    ),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("userId", ["userId"])
+    .index("stripeCheckoutSessionId", ["stripeCheckoutSessionId"]),
+
   favorites: defineTable({
     userId: v.string(),
     movieId: v.string(),

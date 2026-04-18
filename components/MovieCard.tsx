@@ -9,6 +9,7 @@ import { useState } from "react";
 import toast from "react-hot-toast";
 import { api } from "@/convex/_generated/api";
 import { authClient } from "@/lib/auth-client";
+import { trackEvent } from "@/lib/analytics";
 import timeFormat from "@/lib/timeFormat";
 
 interface Movie {
@@ -40,8 +41,20 @@ const MovieCard = ({ movie }: MovieCardProps) => {
   const formattedRuntime = timeFormat(movie.runtime);
   const isFavorite = favoriteState?.isFavorite ?? false;
 
+  const handleMovieOpen = (source: "poster" | "buy_tickets") => {
+    trackEvent("select_movie", {
+      movie_id: movie.id,
+      movie_title: movie.title,
+      source,
+    });
+  };
+
   const handleFavoriteToggle = async () => {
     if (!session?.session) {
+      trackEvent("favorites_auth_gate", {
+        movie_id: movie.id,
+        movie_title: movie.title,
+      });
       toast.error("Sign in to save favorites.");
       router.push("/sign-in");
       return;
@@ -52,6 +65,10 @@ const MovieCard = ({ movie }: MovieCardProps) => {
     try {
       if (isFavorite) {
         await removeFavorite({ movieId: String(movie.id) });
+        trackEvent("remove_favorite", {
+          movie_id: movie.id,
+          movie_title: movie.title,
+        });
         toast.success("Removed from favorites");
       } else {
         await addFavorite({
@@ -61,6 +78,10 @@ const MovieCard = ({ movie }: MovieCardProps) => {
           backdropPath: movie.backdrop_path ?? undefined,
           releaseDate: movie.release_date || undefined,
           voteAverage: movie.vote_average,
+        });
+        trackEvent("add_favorite", {
+          movie_id: movie.id,
+          movie_title: movie.title,
         });
         toast.success("Added to favorites");
       }
@@ -74,7 +95,7 @@ const MovieCard = ({ movie }: MovieCardProps) => {
   return (
     <div className="flex flex-col justify-between p-3 bg-gray-800 rounded-2xl hover:-translate-y-1 transition duration-300 w-66">
       <div className="relative">
-      <Link href={`/movies/${movie.id}`}>
+      <Link href={`/movies/${movie.id}`} onClick={() => handleMovieOpen("poster")}>
         <Image
           src={movie.backdrop_path
             ? movie.backdrop_path.startsWith("http")
@@ -108,6 +129,7 @@ const MovieCard = ({ movie }: MovieCardProps) => {
       <div className="flex items-center justify-between mt-4 pb-3">
         <Link
           href={`/movies/${movie.id}`}
+          onClick={() => handleMovieOpen("buy_tickets")}
           className="mt-4 rounded-full bg-red-800 px-4 py-2 text-xs font-medium text-white transition hover:bg-red-500 cursor-pointer"
         >
           Buy Tickets

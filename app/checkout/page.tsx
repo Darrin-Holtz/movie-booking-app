@@ -4,9 +4,12 @@ import { useQuery } from "convex/react";
 import { ArrowRightIcon, CreditCardIcon, TicketPlus } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
+import { useEffect, useState } from "react";
+import toast from "react-hot-toast";
 import Loading from "@/components/Loading";
 import { api } from "@/convex/_generated/api";
 import { authClient } from "@/lib/auth-client";
+import { trackEvent } from "@/lib/analytics";
 
 type Booking = {
   id: string;
@@ -29,10 +32,66 @@ export default function CheckoutPage() {
   const { data: session, isPending } = authClient.useSession();
   const searchParams = useSearchParams();
   const bookingId = searchParams.get("bookingId");
+  const isCanceled = searchParams.get("canceled") === "1";
   const bookings = useQuery(
     api.showSessions.getMyBookings,
     session?.session ? {} : "skip"
   ) as Booking[] | undefined;
+  const [isRedirectingToPayment, setIsRedirectingToPayment] = useState(false);
+  const unpaidBookings = bookings?.filter((booking) => !booking.isPaid) ?? [];
+  const focusedBooking = bookingId
+    ? unpaidBookings.find((booking) => booking.id === bookingId) ?? null
+    : null;
+  const checkoutItems = focusedBooking ? [focusedBooking] : unpaidBookings;
+  const totalDue = checkoutItems.reduce((sum, booking) => sum + booking.totalPrice, 0);
+
+  useEffect(() => {
+    if (!session?.session || !bookings) {
+      return;
+    }
+
+    trackEvent("view_checkout", {
+      booking_count: checkoutItems.length,
+      total_due: Number(totalDue.toFixed(2)),
+    });
+  }, [bookings, checkoutItems.length, session?.session, totalDue]);
+
+  const handlePayNow = async () => {
+    if (checkoutItems.length === 0) {
+      return;
+    }
+
+    setIsRedirectingToPayment(true);
+    trackEvent("checkout_payment_cta", {
+      booking_count: checkoutItems.length,
+      total_due: Number(totalDue.toFixed(2)),
+    });
+
+    try {
+      const response = await fetch("/api/payments/checkout", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          bookingIds: checkoutItems.map((booking) => booking.id),
+        }),
+      });
+
+      const data = (await response.json()) as { error?: string; url?: string };
+
+      if (!response.ok || !data.url) {
+        throw new Error(data.error ?? "Unable to start Stripe checkout.");
+      }
+
+      window.location.assign(data.url);
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Unable to start Stripe checkout."
+      );
+      setIsRedirectingToPayment(false);
+    }
+  };
 
   if (isPending) {
     return <Loading />;
@@ -56,16 +115,15 @@ export default function CheckoutPage() {
     return <Loading />;
   }
 
-  const unpaidBookings = bookings.filter((booking) => !booking.isPaid);
-  const focusedBooking = bookingId
-    ? unpaidBookings.find((booking) => booking.id === bookingId)
-    : null;
-  const checkoutItems = focusedBooking ? [focusedBooking] : unpaidBookings;
-  const totalDue = checkoutItems.reduce((sum, booking) => sum + booking.totalPrice, 0);
-
   return (
     <main className="min-h-screen bg-[radial-gradient(circle_at_top,rgba(127,29,29,0.2),transparent_38%),linear-gradient(180deg,#120909_0%,#050505_100%)] px-6 pb-12 pt-32 text-white md:px-12">
       <div className="mx-auto max-w-5xl space-y-8">
+        {isCanceled ? (
+          <section className="rounded-3xl border border-amber-400/15 bg-amber-400/10 p-5 text-sm text-amber-100 shadow-xl shadow-black/20">
+            Stripe checkout was canceled. Your seats remain on hold until the payment window expires.
+          </section>
+        ) : null}
+
         <section className="rounded-3xl border border-white/10 bg-white/5 p-8 shadow-2xl shadow-black/40 backdrop-blur-xl">
           <div className="flex items-center gap-4">
             <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-red-900/70">
@@ -117,8 +175,8 @@ export default function CheckoutPage() {
                 <p className="text-sm text-white/55">Grand total</p>
                 <p className="mt-1 text-3xl font-semibold text-white">{formatPrice(totalDue)}</p>
               </div>
-              <button type="button" className="rounded-full bg-red-700 px-6 py-3 text-sm font-medium text-white transition hover:bg-red-600">
-                Pay now soon
+              <button type="button" onClick={handlePayNow} disabled={isRedirectingToPayment} className="rounded-full bg-red-700 px-6 py-3 text-sm font-medium text-white transition hover:bg-red-600 disabled:cursor-not-allowed disabled:opacity-60">
+                {isRedirectingToPayment ? "Redirecting to Stripe..." : "Pay with Stripe"}
               </button>
             </div>
           </section>

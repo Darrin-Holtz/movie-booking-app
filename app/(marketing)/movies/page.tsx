@@ -1,6 +1,5 @@
-import { getPopularMovies } from "@/lib/tmdb"
-import MovieCard from "../../../components/MovieCard"
-import BlurCircle from "../../../components/BlurCircle";
+import MoviesBrowse from "@/components/MoviesBrowse";
+import { getPopularMovies } from "@/lib/tmdb";
 
 export type TmdbMovie = {
     id: number;
@@ -15,22 +14,52 @@ export type TmdbMovie = {
     runtime?: number;
 };
 
-const FEATURED_MOVIES_LIMIT = 10;
+type PageSearchParams = Promise<{
+    [key: string]: string | string[] | undefined;
+}>;
 
-const Movies = async () => {
-    const movies = await getPopularMovies()
+const getSearchParam = (
+    value: string | string[] | undefined,
+    fallback: string
+) => {
+    if (typeof value === "string") {
+        return value;
+    }
+
+    if (Array.isArray(value) && value.length > 0) {
+        return value[0] ?? fallback;
+    }
+
+    return fallback;
+};
+
+const Movies = async ({
+    searchParams,
+}: {
+    searchParams: PageSearchParams;
+}) => {
+    const [movies, resolvedSearchParams] = await Promise.all([
+        getPopularMovies(),
+        searchParams,
+    ]);
+    const query = getSearchParam(resolvedSearchParams.q, "");
+    const initialMode = getSearchParam(
+        resolvedSearchParams.mode,
+        query ? "search" : "popular"
+    );
 
     return movies.length > 0 ? (
-        <div className="relative my-40 mb-60 px-6 md:px-16 lg:px-40 xl:px-44 overflow-hidden min-h-[80vh]">
-            <BlurCircle top="150px" left="0px" />
-            <BlurCircle bottom="50px" right="50px" />
-            <h1 className="text-lg font-medium my-4">Now Showing</h1>
-            <div className="flex flex-wrap max-sm:justify-center gap-8">
-                {movies.slice(0, FEATURED_MOVIES_LIMIT).map((movie) => (
-                    <MovieCard movie={movie} key={movie.id} />
-                ))}
-            </div>
-        </div>
+        <MoviesBrowse
+            movies={movies}
+            initialState={{
+                mode: initialMode === "search" ? "search" : "popular",
+                query,
+                genre: getSearchParam(resolvedSearchParams.genre, "all"),
+                year: getSearchParam(resolvedSearchParams.year, "all"),
+                rating: getSearchParam(resolvedSearchParams.rating, "0"),
+                sort: getSearchParam(resolvedSearchParams.sort, "popular"),
+            }}
+        />
     ) : (
         <div className="flex flex-col items-center justify-center h-screen">
             <h1 className="text-3xl font-bold text-center">
