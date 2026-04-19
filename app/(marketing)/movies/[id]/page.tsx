@@ -309,6 +309,9 @@ const MovieDetails = () => {
                         </div>
                     </div>
                 )}
+                <div className="mt-16 rounded-3xl border border-white/10 bg-white/4 px-6 py-5 text-sm text-white/70">
+                    Showtimes on the next page come from QuickShow cinemas inside this app, not from TMDB.
+                </div>
                 <DateSelect dateTime={show.dateTime} movieId={id}/>
                 <h3 className="text-lg font-medium mt-20 mb-8">You May Also Like</h3>
                 <div className="flex flex-wrap max-sm:justify-center gap-8">

@@ -15,10 +15,12 @@ type Booking = {
   id: string;
   movieId: string;
   movieTitle: string;
+  theatreName: string;
+  theatreLocationLabel: string;
   date: string;
   time: string;
   seats: string[];
-  status: "held" | "confirmed";
+  status: "held" | "confirmed" | "canceled";
   isPaid: boolean;
   seatPrice: number;
   totalPrice: number;
@@ -159,6 +161,9 @@ export default function CheckoutPage() {
                   <div>
                     <h2 className="text-2xl font-semibold text-white">{booking.movieTitle}</h2>
                     <p className="mt-2 text-sm text-white/65">
+                      {booking.theatreName} • {booking.theatreLocationLabel}
+                    </p>
+                    <p className="mt-1 text-sm text-white/65">
                       {booking.date} at {booking.time} • Seats {booking.seats.join(", ")}
                     </p>
                   </div>

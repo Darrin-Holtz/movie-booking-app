@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery } from "convex/react";
-import { ArrowRightIcon, Cog, HeartIcon, LogOut, MenuIcon, TicketPlus, XIcon } from "lucide-react";
+import { ArrowRightIcon, Cog, HeartIcon, LogOut, MenuIcon, ShieldCheckIcon, TicketPlus, XIcon } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
@@ -17,6 +17,10 @@ const Navbar = () => {
         api.favorites.getMyFavorites,
         session?.session ? {} : "skip"
     ) as Array<{ _id: string }> | undefined;
+    const ticketScannerAccess = useQuery(
+        api.userProfiles.getTicketScannerAccess,
+        session?.session ? {} : "skip"
+    ) as { isStaff: boolean; canBootstrap: boolean } | undefined;
     const [isSigningOut, setIsSigningOut] = useState(false);
     const [isOpen, setIsOpen] = useState(false);
     const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
@@ -209,6 +213,21 @@ const Navbar = () => {
                                             Manage Account
                                         </Link>
 
+                                        {ticketScannerAccess?.isStaff || ticketScannerAccess?.canBootstrap ? (
+                                            <>
+                                                <div className="h-px bg-white/10" />
+
+                                                <Link
+                                                    className="flex items-center gap-3 px-5 py-4 text-sm text-white/85 transition hover:bg-white/5 hover:text-white"
+                                                    href="/staff"
+                                                    onClick={handleNavClick}
+                                                >
+                                                    <ShieldCheckIcon className="h-4 w-4" />
+                                                    Staff Dashboard
+                                                </Link>
+                                            </>
+                                        ) : null}
+
                                         <div className="h-px bg-white/10" />
 
                                         <Link
@@ -331,6 +350,16 @@ const Navbar = () => {
                                         <Cog className="h-4 w-4" />
                                         Manage Account
                                     </Link>
+                                    {ticketScannerAccess?.isStaff || ticketScannerAccess?.canBootstrap ? (
+                                        <Link
+                                            className="flex items-center justify-center gap-3 rounded-full border border-white/15 px-6 py-3 text-center"
+                                            href="/staff"
+                                            onClick={handleNavClick}
+                                        >
+                                            <ShieldCheckIcon className="h-4 w-4" />
+                                            Staff Dashboard
+                                        </Link>
+                                    ) : null}
                                     <Link
                                         className="flex items-center justify-center gap-3 rounded-full border border-white/15 px-6 py-3 text-center"
                                         href="/my-bookings"

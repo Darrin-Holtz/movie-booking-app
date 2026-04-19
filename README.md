@@ -9,6 +9,8 @@ QuickShow is a movie booking demo built with Next.js App Router, Convex, Better 
 - Movie detail pages with cast, recommendations, and trailer playback.
 - Date and session selection with server-backed seat holds in Convex.
 - Account, favorites, bookings, Stripe checkout, and confirmation flows.
+- Mobile tickets with real QR codes plus a staff scan flow.
+- Upcoming and past booking sections that switch over after a movie ends.
 - Lightweight analytics hooks for key funnel events.
 
 ## Stack
@@ -36,6 +38,12 @@ STRIPE_WEBHOOK_SECRET=whsec_...
 `STRIPE_WEBHOOK_SECRET` should match the signing secret for the specific Stripe webhook endpoint that points at your Convex deployment's `/stripe/webhook` endpoint.
 Because the webhook handler runs in Convex, `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET` must also be set in the active Convex deployment with `npx convex env set`.
 
+Ticket staff is managed inside the app now:
+
+- The first signed-in user can claim the first ticket staff slot from the account page.
+- After that, ticket staff can add or remove other staff emails from the same account page.
+- The scan screen supports live camera QR scanning when the browser supports it, and photo upload as a fallback on phones that do not support live detection.
+
 ## Commands
 
 ```bash
@@ -52,11 +60,14 @@ pnpm start
 - Layout metadata is set up for real app titles, descriptions, and social previews.
 - Analytics events are exposed through `lib/analytics.ts` and `components/AnalyticsProvider.tsx`.
 - Stripe checkout creation lives in `app/api/payments/checkout/route.ts`, while webhook confirmation runs through `convex/http.ts` and `convex/payments.ts`.
+- Booking status timing is based on `America/New_York`.
+- Confirmed tickets stay in Upcoming until the movie end time, then move into Past Bookings.
 
 ## Current Limitations
 
 - Analytics events are emitted to `window.dataLayer` and browser custom events, but no external analytics sink is configured yet.
 - Stripe requires local or deployed webhook configuration before payment confirmation will complete automatically.
+- Staff management is handled in-app, but there is not yet a separate dedicated staff dashboard.
 
 ## Verification
 

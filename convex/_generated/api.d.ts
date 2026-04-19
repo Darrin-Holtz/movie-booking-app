@@ -13,6 +13,7 @@ import type * as favorites from "../favorites.js";
 import type * as http from "../http.js";
 import type * as payments from "../payments.js";
 import type * as showSessions from "../showSessions.js";
+import type * as staffAccess from "../staffAccess.js";
 import type * as userProfiles from "../userProfiles.js";
 
 import type {
@@ -27,6 +28,7 @@ declare const fullApi: ApiFromModules<{
   http: typeof http;
   payments: typeof payments;
   showSessions: typeof showSessions;
+  staffAccess: typeof staffAccess;
   userProfiles: typeof userProfiles;
 }>;
 

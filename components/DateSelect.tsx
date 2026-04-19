@@ -80,7 +80,7 @@ const DateSelect = ({ dateTime, movieId }: DateSelectProps) => {
         </div>
 
         <button onClick={handleBookNow} className="bg-red-700 text-white px-8 py-2 mt-6 rounded hover:bg-red-700/90 transition-all cursor-pointer">
-          Book Now
+          See Showtimes
         </button>
       </div>
     </div>

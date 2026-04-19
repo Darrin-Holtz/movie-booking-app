@@ -40,13 +40,25 @@ type Booking = {
   date: string;
   time: string;
   seats: string[];
-  status: "held" | "confirmed";
+  status: "held" | "confirmed" | "canceled";
   isPaid: boolean;
+  isPast: boolean;
+  refundedAt?: number | null;
+  refundStatus?: "pending" | "succeeded" | null;
+  refundId?: string | null;
 };
 
 type ProfileRecord = {
   avatarUrl: string | null;
   hasStoredAvatar: boolean;
+};
+
+type TicketScannerAccess = {
+  email: string | null;
+  isStaff: boolean;
+  isConfigured: boolean;
+  canBootstrap: boolean;
+  totalStaffMembers: number;
 };
 
 type StorageUploadResponse = {
@@ -76,6 +88,15 @@ const formatDisplayDate = (dateParam: string) => {
   });
 };
 
+const copyRefundId = async (refundId: string) => {
+  try {
+    await navigator.clipboard.writeText(refundId);
+    toast.success("Refund ID copied.");
+  } catch {
+    toast.error("Unable to copy refund ID.");
+  }
+};
+
 export default function AccountPage() {
   const router = useRouter();
   const avatarInputRef = useRef<HTMLInputElement | null>(null);
@@ -102,6 +123,10 @@ export default function AccountPage() {
     api.showSessions.getMyBookings,
     session?.session ? {} : "skip"
   ) as Booking[] | undefined;
+  const ticketScannerAccess = useQuery(
+    api.userProfiles.getTicketScannerAccess,
+    session?.session ? {} : "skip"
+  ) as TicketScannerAccess | undefined;
   const generateAvatarUploadUrl = useMutation(api.userProfiles.generateAvatarUploadUrl);
   const resolveAvatarUpload = useMutation(api.userProfiles.resolveAvatarUpload);
   const commitAvatarUpload = useMutation(api.userProfiles.commitAvatarUpload);
@@ -179,7 +204,12 @@ export default function AccountPage() {
     );
   }
 
-  if (!favorites || !bookings || profile === undefined) {
+  if (
+    !favorites ||
+    !bookings ||
+    profile === undefined ||
+    ticketScannerAccess === undefined
+  ) {
     return <Loading />;
   }
 
@@ -201,8 +231,13 @@ export default function AccountPage() {
 
   const activeHolds = bookings.filter((booking) => booking.status === "held");
   const confirmedBookings = bookings.filter((booking) => booking.status === "confirmed");
+  const canceledBookings = bookings.filter((booking) => booking.status === "canceled");
   const latestFavorite = favorites[0];
-  const nextBooking = bookings[0];
+  const nextBooking = bookings.find((booking) => booking.status !== "canceled" && !booking.isPast);
+  const recentCanceledBooking = canceledBookings
+    .slice()
+    .sort((left, right) => (right.refundedAt ?? 0) - (left.refundedAt ?? 0))[0];
+  const scannerRoleLabel = ticketScannerAccess.isStaff ? "Staff" : "Member";
 
   const selectedAvatarLabel = selectedAvatarFile
     ? `${selectedAvatarFile.name} • ${(selectedAvatarFile.size / (1024 * 1024)).toFixed(1)} MB`
@@ -458,7 +493,7 @@ export default function AccountPage() {
               </div>
               <div className="rounded-2xl border border-white/10 bg-black/20 px-4 py-3">
                 <p className="text-white/55">Status</p>
-                <p className="mt-2 text-lg font-semibold text-white">Member</p>
+                <p className="mt-2 text-lg font-semibold text-white">{scannerRoleLabel}</p>
               </div>
             </div>
           </div>
@@ -483,6 +518,15 @@ export default function AccountPage() {
             >
               Browse movies
             </Link>
+            {ticketScannerAccess.isStaff || ticketScannerAccess.canBootstrap ? (
+              <Link
+                href="/staff"
+                className="inline-flex items-center gap-2 rounded-full border border-white/15 px-6 py-3 text-sm font-medium text-white transition hover:border-white/30"
+              >
+                <ShieldCheckIcon className="h-4 w-4" />
+                Staff dashboard
+              </Link>
+            ) : null}
           </div>
         </section>
 
@@ -676,6 +720,44 @@ export default function AccountPage() {
                 </button>
               </form>
             </article>
+
+            <article className="rounded-3xl border border-white/10 bg-white/5 p-6 shadow-xl shadow-black/25 backdrop-blur-xl">
+              <div className="flex items-center gap-3">
+                <ShieldCheckIcon className="h-5 w-5 text-red-300" />
+                <p className="text-sm uppercase tracking-[0.28em] text-red-300/80">Staff Dashboard</p>
+              </div>
+
+              <div className="mt-5 rounded-2xl border border-white/10 bg-black/20 p-4">
+                <p className="text-sm leading-6 text-white/60">
+                  Staff tools now live on a separate dashboard so scanning, check-in, ticket lookup, and staff access are not mixed into your personal account settings.
+                </p>
+                <div className="mt-4 flex flex-wrap gap-3 text-sm text-white/60">
+                  <span className="rounded-full border border-white/10 bg-black/20 px-3 py-1.5">
+                    Status {scannerRoleLabel}
+                  </span>
+                  <span className="rounded-full border border-white/10 bg-black/20 px-3 py-1.5">
+                    Staff members {ticketScannerAccess.totalStaffMembers}
+                  </span>
+                </div>
+                <div className="mt-5 flex flex-wrap gap-3">
+                  <Link
+                    href="/staff"
+                    className="inline-flex items-center gap-2 rounded-full bg-red-800 px-5 py-3 text-sm font-medium text-white transition hover:bg-red-700"
+                  >
+                    Open staff dashboard
+                    <ArrowRightIcon className="h-4 w-4" strokeWidth={3} />
+                  </Link>
+                  {ticketScannerAccess.isStaff ? (
+                    <Link
+                      href="/tickets/scan?camera=1"
+                      className="inline-flex items-center gap-2 rounded-full border border-white/15 px-5 py-3 text-sm font-medium text-white transition hover:border-white/30"
+                    >
+                      Open live scanner
+                    </Link>
+                  ) : null}
+                </div>
+              </div>
+            </article>
           </div>
 
           <article className="rounded-3xl border border-white/10 bg-white/5 p-6 shadow-xl shadow-black/25 backdrop-blur-xl">
@@ -715,6 +797,37 @@ export default function AccountPage() {
                 ) : (
                   <p className="mt-3 text-sm leading-6 text-white/60">
                     You have not saved any favorites yet. Use the heart icon on movie pages to start building your shortlist.
+                  </p>
+                )}
+              </div>
+
+              <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+                <div className="flex items-center gap-3 text-sm text-white/55">
+                  <ShieldCheckIcon className="h-4 w-4 text-red-300" />
+                  Recent refund
+                </div>
+                {recentCanceledBooking ? (
+                  <>
+                    <p className="mt-3 text-lg font-semibold text-white">{recentCanceledBooking.movieTitle}</p>
+                    <p className="mt-2 text-sm text-white/60">
+                      {recentCanceledBooking.refundStatus === "succeeded" ? "Refund sent" : "Refund pending"}
+                      {recentCanceledBooking.refundedAt
+                        ? ` • ${new Date(recentCanceledBooking.refundedAt).toLocaleDateString("en-US")}`
+                        : ""}
+                    </p>
+                    {recentCanceledBooking.refundId ? (
+                      <button
+                        type="button"
+                        onClick={() => void copyRefundId(recentCanceledBooking.refundId!)}
+                        className="mt-2 inline-flex items-center rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-white/55 transition hover:border-white/25 hover:text-white/80"
+                      >
+                        Refund ID {recentCanceledBooking.refundId}
+                      </button>
+                    ) : null}
+                  </>
+                ) : (
+                  <p className="mt-3 text-sm leading-6 text-white/60">
+                    No refunds yet. Canceled tickets will show their refund status here.
                   </p>
                 )}
               </div>

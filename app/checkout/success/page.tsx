@@ -5,12 +5,23 @@ import { CheckCircle2Icon, Clock3Icon, TicketPlusIcon } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import toast from "react-hot-toast";
 import { useAuthSession } from "@/components/AuthSessionProvider";
 import Loading from "@/components/Loading";
+import TicketPass from "@/components/TicketPass";
 import { api } from "@/convex/_generated/api";
 import { trackEvent } from "@/lib/analytics";
 
 const formatPrice = (amount: number) => `$${amount.toFixed(2)}`;
+
+const copyRefundId = async (refundId: string) => {
+  try {
+    await navigator.clipboard.writeText(refundId);
+    toast.success("Refund ID copied.");
+  } catch {
+    toast.error("Unable to copy refund ID.");
+  }
+};
 
 export default function CheckoutSuccessPage() {
   const { data: session, isPending } = useAuthSession();
@@ -100,6 +111,7 @@ export default function CheckoutSuccessPage() {
   }
 
   const isCompleted = checkout.status === "completed";
+  const refundedItems = checkout.items.filter((item) => item.refundStatus);
 
   return (
     <main className="min-h-screen bg-[radial-gradient(circle_at_top,rgba(127,29,29,0.2),transparent_38%),linear-gradient(180deg,#120909_0%,#050505_100%)] px-6 pb-12 pt-32 text-white md:px-12">
@@ -145,18 +157,79 @@ export default function CheckoutSuccessPage() {
                   <div>
                     <h2 className="text-xl font-semibold text-white">{item.movieTitle}</h2>
                     <p className="mt-2 text-sm text-white/65">
+                      {item.theatreName ?? "QuickShow Cinema"} • {item.theatreLocationLabel ?? "In-app location"}
+                    </p>
+                    <p className="mt-1 text-sm text-white/65">
                       {item.date} at {item.time}
                     </p>
                     <p className="mt-1 text-sm text-white/65">Seats {item.seatLabels.join(", ")}</p>
+                    {item.ticketCode ? <p className="mt-2 text-sm font-medium text-red-200">Ticket code {item.ticketCode}</p> : null}
                   </div>
                   <div className="text-right">
                     <p className="text-sm text-white/55">Line total</p>
                     <p className="mt-1 text-xl font-semibold text-white">{formatPrice(item.totalPrice)}</p>
                   </div>
                 </div>
+                {item.refundStatus ? (
+                  <div className="mt-4 rounded-2xl border border-amber-400/20 bg-amber-400/10 p-4 text-sm text-amber-100">
+                    <p className="font-medium">
+                      {item.refundStatus === "succeeded" ? "Refund sent" : "Refund pending"}
+                    </p>
+                    <p className="mt-2 text-amber-100/80">
+                      Amount {formatPrice(item.refundedAmount ?? item.totalPrice)}
+                      {item.refundedAt
+                        ? ` • Updated ${new Date(item.refundedAt).toLocaleDateString("en-US")}`
+                        : ""}
+                    </p>
+                    {item.refundId ? (
+                      <button
+                        type="button"
+                        onClick={() => void copyRefundId(item.refundId!)}
+                        className="mt-3 inline-flex items-center rounded-full border border-amber-200/20 bg-black/15 px-3 py-1 text-xs font-medium text-amber-100 transition hover:border-amber-100/40"
+                      >
+                        Refund ID {item.refundId}
+                      </button>
+                    ) : null}
+                  </div>
+                ) : null}
               </article>
             ))}
           </div>
+
+          {refundedItems.length > 0 ? (
+            <div className="mt-6 rounded-3xl border border-amber-400/20 bg-amber-400/10 p-5">
+              <p className="text-sm uppercase tracking-[0.28em] text-amber-100/80">Refund update</p>
+              <p className="mt-3 text-sm text-amber-100/85">
+                {refundedItems.length === 1
+                  ? "One ticket from this checkout has a refund update."
+                  : `${refundedItems.length} tickets from this checkout have refund updates.`}
+              </p>
+            </div>
+          ) : null}
+
+          {isCompleted ? (
+            <div className="mt-6 grid gap-5">
+              {checkout.items
+                .filter((item) => typeof item.ticketCode === "string")
+                .map((item) => (
+                  <div key={`${item.sessionId}-ticket`} className="space-y-3">
+                    <TicketPass
+                      movieTitle={item.movieTitle}
+                      theatreName={item.theatreName ?? "QuickShow Cinema"}
+                      theatreLocationLabel={item.theatreLocationLabel ?? "In-app location"}
+                      auditoriumName="Main House"
+                      date={item.date}
+                      time={item.time}
+                      seats={item.seatLabels}
+                      ticketCode={item.ticketCode!}
+                    />
+                    <Link href={`/tickets/${item.ticketCode}`} className="inline-flex items-center gap-2 rounded-full border border-white/15 px-5 py-2.5 text-sm font-medium text-white transition hover:border-white/30">
+                      Open mobile ticket
+                    </Link>
+                  </div>
+                ))}
+            </div>
+          ) : null}
 
           <div className="mt-6 flex flex-wrap gap-4">
             <Link href="/my-bookings" className="inline-flex items-center gap-2 rounded-full bg-red-800 px-6 py-3 text-sm font-medium text-white transition hover:bg-red-700">
