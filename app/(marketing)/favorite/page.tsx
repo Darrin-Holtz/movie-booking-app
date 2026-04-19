@@ -3,10 +3,10 @@
 import { useQuery } from "convex/react";
 import { ArrowRightIcon, HeartIcon } from "lucide-react";
 import Link from "next/link";
+import { useAuthSession } from "@/components/AuthSessionProvider";
 import Loading from "@/components/Loading";
 import MovieCard from "@/components/MovieCard";
 import { api } from "@/convex/_generated/api";
-import { authClient } from "@/lib/auth-client";
 
 type FavoriteMovie = {
     _id: string;
@@ -20,7 +20,7 @@ type FavoriteMovie = {
 };
 
 export default function FavoritePage() {
-    const { data: session, isPending } = authClient.useSession();
+    const { data: session, isPending } = useAuthSession();
     const favorites = useQuery(
         api.favorites.getMyFavorites,
         session?.session ? {} : "skip"

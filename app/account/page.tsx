@@ -20,6 +20,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ChangeEvent, FormEvent, useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
+import { useAuthSession } from "@/components/AuthSessionProvider";
 import Loading from "@/components/Loading";
 import { api } from "@/convex/_generated/api";
 import { authClient } from "@/lib/auth-client";
@@ -88,7 +89,7 @@ export default function AccountPage() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [revokeOtherSessions, setRevokeOtherSessions] = useState(true);
   const [isChangingPassword, setIsChangingPassword] = useState(false);
-  const { data: session, isPending } = authClient.useSession();
+  const { data: session, isPending } = useAuthSession();
   const favorites = useQuery(
     api.favorites.getMyFavorites,
     session?.session ? {} : "skip"

@@ -7,9 +7,9 @@ import { useParams, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
 import BlurCircle from "@/components/BlurCircle";
+import { useAuthSession } from "@/components/AuthSessionProvider";
 import Loading from "@/components/Loading";
 import { api } from "@/convex/_generated/api";
-import { authClient } from "@/lib/auth-client";
 import { trackEvent } from "@/lib/analytics";
 import { getShowtimePrice } from "@/lib/showtimePricing";
 import timeFormat from "@/lib/timeFormat";
@@ -97,7 +97,7 @@ export default function SeatLayoutPage() {
   const date = params?.date ?? "";
   const router = useRouter();
 
-  const { data: authSession } = authClient.useSession();
+  const { data: authSession } = useAuthSession();
   const ensureSessions = useMutation(api.showSessions.ensureSessions);
   const syncSeatHold = useMutation(api.showSessions.reserveSeats);
   const sessionAvailability = useQuery(

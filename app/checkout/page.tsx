@@ -6,9 +6,9 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
+import { useAuthSession } from "@/components/AuthSessionProvider";
 import Loading from "@/components/Loading";
 import { api } from "@/convex/_generated/api";
-import { authClient } from "@/lib/auth-client";
 import { trackEvent } from "@/lib/analytics";
 
 type Booking = {
@@ -29,7 +29,7 @@ type Booking = {
 const formatPrice = (amount: number) => `$${amount.toFixed(2)}`;
 
 export default function CheckoutPage() {
-  const { data: session, isPending } = authClient.useSession();
+  const { data: session, isPending } = useAuthSession();
   const searchParams = useSearchParams();
   const bookingId = searchParams.get("bookingId");
   const isCanceled = searchParams.get("canceled") === "1";

@@ -5,15 +5,15 @@ import { CheckCircle2Icon, Clock3Icon, TicketPlusIcon } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import { useAuthSession } from "@/components/AuthSessionProvider";
 import Loading from "@/components/Loading";
 import { api } from "@/convex/_generated/api";
-import { authClient } from "@/lib/auth-client";
 import { trackEvent } from "@/lib/analytics";
 
 const formatPrice = (amount: number) => `$${amount.toFixed(2)}`;
 
 export default function CheckoutSuccessPage() {
-  const { data: session, isPending } = authClient.useSession();
+  const { data: session, isPending } = useAuthSession();
   const searchParams = useSearchParams();
   const sessionId = searchParams.get("session_id") ?? "";
   const recoveryAttemptedForSession = useRef<string | null>(null);

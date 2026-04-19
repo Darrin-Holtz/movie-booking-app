@@ -12,9 +12,9 @@ import {
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { useAuthSession } from "@/components/AuthSessionProvider";
 import Loading from "@/components/Loading";
 import { api } from "@/convex/_generated/api";
-import { authClient } from "@/lib/auth-client";
 
 type Booking = {
   id: string;
@@ -72,7 +72,7 @@ const getPosterUrl = (posterPath?: string) => {
 };
 
 export default function MyBookingsPage() {
-  const { data: session, isPending } = authClient.useSession();
+  const { data: session, isPending } = useAuthSession();
   const bookings = useQuery(
     api.showSessions.getMyBookings,
     session?.session ? {} : "skip"

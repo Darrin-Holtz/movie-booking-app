@@ -7,8 +7,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import toast from "react-hot-toast";
+import { useAuthSession } from "@/components/AuthSessionProvider";
 import { api } from "@/convex/_generated/api";
-import { authClient } from "@/lib/auth-client";
 import { trackEvent } from "@/lib/analytics";
 import timeFormat from "@/lib/timeFormat";
 
@@ -30,7 +30,7 @@ interface MovieCardProps {
 
 const MovieCard = ({ movie }: MovieCardProps) => {
   const router = useRouter();
-  const { data: session, isPending: isAuthPending } = authClient.useSession();
+  const { data: session, isPending: isAuthPending } = useAuthSession();
   const addFavorite = useMutation(api.favorites.addFavorite);
   const removeFavorite = useMutation(api.favorites.removeFavorite);
   const favoriteState = useQuery(

@@ -7,13 +7,13 @@ import { useParams, useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
 import toast from "react-hot-toast"
 import BlurCircle from "@/components/BlurCircle"
+import { useAuthSession } from "@/components/AuthSessionProvider"
 import { HeartIcon, PlayCircleIcon, StarIcon, XIcon } from "lucide-react"
 import Loading from "@/components/Loading"
 import timeFormat from "@/lib/timeFormat"
 import DateSelect from "@/components/DateSelect"
 import MovieCard from "@/components/MovieCard"
 import { api } from "@/convex/_generated/api"
-import { authClient } from "@/lib/auth-client"
 import { trackEvent } from "@/lib/analytics"
 
 type MovieGenre = {
@@ -87,7 +87,7 @@ const MovieDetails = () => {
     const router = useRouter()
     const params = useParams<{ id: string }>()
     const id = params.id
-    const { data: session, isPending: isAuthPending } = authClient.useSession()
+    const { data: session, isPending: isAuthPending } = useAuthSession()
     const addFavorite = useMutation(api.favorites.addFavorite)
     const removeFavorite = useMutation(api.favorites.removeFavorite)
     const favoriteState = useQuery(
