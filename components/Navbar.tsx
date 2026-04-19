@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery } from "convex/react";
-import { ArrowRightIcon, Cog, HeartIcon, LogOut, MenuIcon, TicketPlus, XIcon } from "lucide-react";
+import { ArrowRightIcon, Cog, HeartIcon, LogOut, MapPin, MenuIcon, TicketPlus, XIcon } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
@@ -156,6 +156,15 @@ const Navbar = () => {
                 <div className="hidden items-center gap-4 xl:flex">
                     <Link
                         className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-5 py-2.5 text-sm font-medium text-white transition hover:border-white/30 hover:bg-white/10"
+                        href="/theatres"
+                        onClick={handleNavClick}
+                    >
+                        Browse Theatres
+                        <MapPin className="h-4 w-4" strokeWidth={2.5} />
+                    </Link>
+
+                    <Link
+                        className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-5 py-2.5 text-sm font-medium text-white transition hover:border-white/30 hover:bg-white/10"
                         href="/movies"
                         onClick={handleNavClick}
                     >
@@ -304,6 +313,15 @@ const Navbar = () => {
                         </div>
 
                         <div className="mt-5 flex flex-col gap-3">
+                            <Link
+                                className="flex items-center justify-center gap-3 rounded-full border border-white/15 px-6 py-3 text-center"
+                                href="/theatres"
+                                onClick={handleNavClick}
+                            >
+                                <MapPin className="h-4 w-4" />
+                                Browse Theatres
+                            </Link>
+
                             <Link
                                 className="flex items-center justify-center gap-3 rounded-full bg-red-800 px-6 py-3 text-center font-medium transition hover:bg-red-700"
                                 href="/movies"
