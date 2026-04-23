@@ -33,7 +33,7 @@ export async function POST(request: Request) {
       bookingIds: body.bookingIds as Id<"showSessions">[],
       addOns: body.addOns ?? [],
     });
-    const appUrl = getAppUrl();
+    const appUrl = getAppUrl(request);
     const lineItems = [
       ...checkout.items.map((item) => ({
         quantity: item.seatLabels.length,
