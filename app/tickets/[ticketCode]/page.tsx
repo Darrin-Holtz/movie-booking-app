@@ -72,6 +72,7 @@ export default function TicketPage() {
           time={ticket.time}
           seats={ticket.seats}
           ticketCode={ticket.ticketCode}
+          addOns={ticket.addOns ?? []}
           state={ticket.isUsed ? "used" : "active"}
         />
       </div>

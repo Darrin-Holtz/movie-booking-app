@@ -20,6 +20,9 @@ const seatMapRowValidator = v.object({
 export default defineSchema({
   paymentCheckouts: defineTable({
     userId: v.string(),
+    customerEmail: v.optional(v.string()),
+    customerName: v.optional(v.string()),
+    sendReceiptEmail: v.optional(v.boolean()),
     stripeCheckoutSessionId: v.optional(v.string()),
     stripePaymentIntentId: v.optional(v.string()),
     status: v.union(
@@ -31,6 +34,19 @@ export default defineSchema({
     currency: v.string(),
     seatCount: v.number(),
     totalPrice: v.number(),
+    addOnsTotal: v.optional(v.number()),
+    addOns: v.optional(
+      v.array(
+        v.object({
+          id: v.string(),
+          name: v.string(),
+          description: v.string(),
+          quantity: v.number(),
+          unitPrice: v.number(),
+          totalPrice: v.number(),
+        })
+      )
+    ),
     expiresAt: v.number(),
     completedAt: v.optional(v.number()),
     items: v.array(
@@ -76,8 +92,11 @@ export default defineSchema({
 
   userProfiles: defineTable({
     userId: v.string(),
+    email: v.optional(v.string()),
     avatarStorageId: v.optional(v.id("_storage")),
     avatarUrl: v.optional(v.string()),
+    marketingEmails: v.optional(v.boolean()),
+    receiptEmails: v.optional(v.boolean()),
     createdAt: v.number(),
     updatedAt: v.number(),
   }).index("userId", ["userId"]),

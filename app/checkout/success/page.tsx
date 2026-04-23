@@ -136,6 +136,11 @@ export default function CheckoutSuccessPage() {
           {!isCompleted && recoveryError ? (
             <p className="mt-4 max-w-2xl text-sm text-amber-200/85">{recoveryError}</p>
           ) : null}
+          {isCompleted && checkout.sendReceiptEmail !== false && checkout.customerEmail ? (
+            <p className="mt-4 max-w-2xl text-sm text-emerald-200/85">
+              A receipt email was sent to {checkout.customerEmail}.
+            </p>
+          ) : null}
         </section>
 
         <section className="rounded-3xl border border-white/10 bg-white/5 p-6 shadow-xl shadow-black/25 backdrop-blur-xl">
@@ -196,6 +201,23 @@ export default function CheckoutSuccessPage() {
             ))}
           </div>
 
+          {checkout.addOns?.length ? (
+            <div className="mt-6 rounded-3xl border border-white/10 bg-black/20 p-5">
+              <p className="text-sm uppercase tracking-[0.28em] text-red-300/80">Food & drink</p>
+              <div className="mt-4 grid gap-3">
+                {checkout.addOns.map((item) => (
+                  <div key={item.id} className="flex items-center justify-between gap-4 rounded-2xl border border-white/10 bg-black/20 px-4 py-3">
+                    <div>
+                      <p className="text-sm font-medium text-white">{item.name}</p>
+                      <p className="text-xs text-white/55">{item.quantity} × {formatPrice(item.unitPrice)}</p>
+                    </div>
+                    <p className="text-sm font-semibold text-white">{formatPrice(item.totalPrice)}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
+
           {refundedItems.length > 0 ? (
             <div className="mt-6 rounded-3xl border border-amber-400/20 bg-amber-400/10 p-5">
               <p className="text-sm uppercase tracking-[0.28em] text-amber-100/80">Refund update</p>
@@ -222,6 +244,7 @@ export default function CheckoutSuccessPage() {
                       time={item.time}
                       seats={item.seatLabels}
                       ticketCode={item.ticketCode!}
+                      addOns={checkout.addOns ?? []}
                     />
                     <Link href={`/tickets/${item.ticketCode}`} className="inline-flex items-center gap-2 rounded-full border border-white/15 px-5 py-2.5 text-sm font-medium text-white transition hover:border-white/30">
                       Open mobile ticket

@@ -12,6 +12,11 @@ type TicketPassProps = {
   time: string;
   seats: string[];
   ticketCode: string;
+  addOns?: Array<{
+    id: string;
+    name: string;
+    quantity: number;
+  }>;
   state?: "active" | "used";
 };
 
@@ -32,6 +37,7 @@ export default function TicketPass({
   time,
   seats,
   ticketCode,
+  addOns = [],
   state = "active",
 }: TicketPassProps) {
   const ticketHref = getTicketHref(ticketCode);
@@ -90,6 +96,23 @@ export default function TicketPass({
             <p className="text-xs uppercase tracking-[0.24em] text-white/50">Seats</p>
             <p className="mt-2 text-lg font-semibold text-white">{seats.join(", ")}</p>
           </div>
+
+          {addOns.length > 0 ? (
+            <div className="rounded-2xl border border-dashed border-white/15 bg-black/25 p-4">
+              <p className="text-xs uppercase tracking-[0.24em] text-white/50">Refreshments</p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {addOns.map((item) => (
+                  <span
+                    key={item.id}
+                    className="rounded-full border border-white/10 bg-white/10 px-3 py-1 text-xs font-medium text-white"
+                  >
+                    {item.quantity}× {item.name}
+                  </span>
+                ))}
+              </div>
+              <p className="mt-2 text-xs text-white/60">Show this order at concessions for pickup.</p>
+            </div>
+          ) : null}
         </div>
 
         <div className="rounded-3xl border border-white/10 bg-white px-4 py-4 text-black shadow-xl shadow-black/20">

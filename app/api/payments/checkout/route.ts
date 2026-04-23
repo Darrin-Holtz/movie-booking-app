@@ -5,6 +5,10 @@ import { getAppUrl, getStripe } from "@/lib/stripe";
 
 type CheckoutRequestBody = {
   bookingIds?: string[];
+  addOns?: Array<{
+    id: "popcorn" | "soda" | "combo";
+    quantity: number;
+  }>;
 };
 
 export async function POST(request: Request) {
@@ -27,15 +31,11 @@ export async function POST(request: Request) {
     const stripe = getStripe();
     const checkout = await fetchAuthMutation(api.payments.prepareCheckout, {
       bookingIds: body.bookingIds as Id<"showSessions">[],
+      addOns: body.addOns ?? [],
     });
     const appUrl = getAppUrl();
-
-    const stripeSession = await stripe.checkout.sessions.create({
-      mode: "payment",
-      success_url: `${appUrl}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${appUrl}/checkout?canceled=1`,
-      customer_email: checkout.customerEmail ?? undefined,
-      line_items: checkout.items.map((item) => ({
+    const lineItems = [
+      ...checkout.items.map((item) => ({
         quantity: item.seatLabels.length,
         price_data: {
           currency: checkout.currency,
@@ -49,10 +49,32 @@ export async function POST(request: Request) {
           },
         },
       })),
+      ...((checkout.addOns ?? []).map((addOn) => ({
+        quantity: addOn.quantity,
+        price_data: {
+          currency: checkout.currency,
+          unit_amount: Math.round(addOn.unitPrice * 100),
+          product_data: {
+            name: addOn.name,
+            description: addOn.description,
+          },
+        },
+      }))),
+    ];
+
+    const stripeSession = await stripe.checkout.sessions.create({
+      mode: "payment",
+      success_url: `${appUrl}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${appUrl}/checkout?canceled=1`,
+      customer_email: checkout.customerEmail ?? undefined,
+      line_items: lineItems,
       metadata: {
         convexCheckoutId: checkout.checkoutId,
         seatCount: String(
           checkout.items.reduce((sum, item) => sum + item.seatLabels.length, 0)
+        ),
+        addOnCount: String(
+          (checkout.addOns ?? []).reduce((sum, item) => sum + item.quantity, 0)
         ),
       },
       payment_intent_data: {

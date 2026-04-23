@@ -869,6 +869,13 @@ export const getMyTicketByCode = query({
       return null;
     }
 
+    const userCheckouts = await ctx.db
+      .query("paymentCheckouts")
+      .withIndex("userId", (query) => query.eq("userId", currentUser._id))
+      .collect();
+    const matchingCheckout = userCheckouts.find((checkout) =>
+      checkout.items.some((item) => item.ticketCode === args.ticketCode)
+    );
     const seatPrice = getShowtimePrice(session.time);
     const seats = myReservations
       .map((reservation) => reservation.seatLabel)
@@ -885,6 +892,7 @@ export const getMyTicketByCode = query({
       date: session.date,
       time: session.time,
       seats,
+      addOns: matchingCheckout?.addOns ?? [],
       totalPrice: seatPrice * seats.length,
       isUsed: myReservations.some((reservation) => reservation.ticketUsedAt !== undefined),
       usedAt:

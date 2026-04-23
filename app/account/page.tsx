@@ -51,6 +51,8 @@ type Booking = {
 type ProfileRecord = {
   avatarUrl: string | null;
   hasStoredAvatar: boolean;
+  marketingEmails: boolean;
+  receiptEmails: boolean;
 };
 
 type TicketScannerAccess = {
@@ -105,6 +107,8 @@ export default function AccountPage() {
   const [localAvatarPreviewUrl, setLocalAvatarPreviewUrl] = useState("");
   const [isAvatarMarkedForRemoval, setIsAvatarMarkedForRemoval] = useState(false);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
+  const [marketingEmailsEnabled, setMarketingEmailsEnabled] = useState(false);
+  const [receiptEmailsEnabled, setReceiptEmailsEnabled] = useState(true);
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -132,6 +136,7 @@ export default function AccountPage() {
   const commitAvatarUpload = useMutation(api.userProfiles.commitAvatarUpload);
   const discardAvatarUpload = useMutation(api.userProfiles.discardAvatarUpload);
   const clearStoredAvatar = useMutation(api.userProfiles.clearStoredAvatar);
+  const updateEmailPreferences = useMutation(api.userProfiles.updateEmailPreferences);
 
   useEffect(() => {
     if (!session?.session) {
@@ -161,6 +166,15 @@ export default function AccountPage() {
       URL.revokeObjectURL(objectUrl);
     };
   }, [selectedAvatarFile]);
+
+  useEffect(() => {
+    if (profile === undefined) {
+      return;
+    }
+
+    setMarketingEmailsEnabled(profile?.marketingEmails ?? false);
+    setReceiptEmailsEnabled(profile?.receiptEmails ?? true);
+  }, [profile]);
 
   if (isPending) {
     return <Loading />;
@@ -218,8 +232,11 @@ export default function AccountPage() {
   const avatarPreviewUrl = localAvatarPreviewUrl || (isAvatarMarkedForRemoval ? "" : currentAvatarUrl);
   const nameChanged = trimmedDisplayName !== (session.user.name ?? "").trim();
   const avatarChanged = Boolean(selectedAvatarFile) || (isAvatarMarkedForRemoval && Boolean(currentAvatarUrl));
+  const emailPreferenceChanged =
+    marketingEmailsEnabled !== (profile?.marketingEmails ?? false) ||
+    receiptEmailsEnabled !== (profile?.receiptEmails ?? true);
 
-  const hasProfileChanges = nameChanged || avatarChanged;
+  const hasProfileChanges = nameChanged || avatarChanged || emailPreferenceChanged;
 
   const avatarLabel =
     (trimmedDisplayName || session.user.name)
@@ -322,33 +339,35 @@ export default function AccountPage() {
         uploadedAvatarUrl = resolvedAvatar.avatarUrl;
       }
 
-      const payload: {
-        name?: string;
-        image?: string | null;
-      } = {};
+      if (nameChanged || uploadedAvatarUrl || isAvatarMarkedForRemoval) {
+        const payload: {
+          name?: string;
+          image?: string | null;
+        } = {};
 
-      if (nameChanged) {
-        payload.name = trimmedDisplayName;
-      }
-
-      if (uploadedAvatarUrl) {
-        payload.image = uploadedAvatarUrl;
-      } else if (isAvatarMarkedForRemoval) {
-        payload.image = null;
-      }
-
-      const result = await authClient.updateUser(payload);
-
-      if (result.error) {
-        if (uploadedStorageId) {
-          await discardAvatarUpload({ storageId: uploadedStorageId });
+        if (nameChanged) {
+          payload.name = trimmedDisplayName;
         }
 
-        toast.error(result.error.message || "Unable to update profile.");
-        return;
-      }
+        if (uploadedAvatarUrl) {
+          payload.image = uploadedAvatarUrl;
+        } else if (isAvatarMarkedForRemoval) {
+          payload.image = null;
+        }
 
-      authProfileUpdated = true;
+        const result = await authClient.updateUser(payload);
+
+        if (result.error) {
+          if (uploadedStorageId) {
+            await discardAvatarUpload({ storageId: uploadedStorageId });
+          }
+
+          toast.error(result.error.message || "Unable to update profile.");
+          return;
+        }
+
+        authProfileUpdated = true;
+      }
 
       if (uploadedStorageId && uploadedAvatarUrl) {
         await commitAvatarUpload({
@@ -359,6 +378,13 @@ export default function AccountPage() {
 
       if (isAvatarMarkedForRemoval && profile?.hasStoredAvatar) {
         await clearStoredAvatar({});
+      }
+
+      if (emailPreferenceChanged) {
+        await updateEmailPreferences({
+          marketingEmails: marketingEmailsEnabled,
+          receiptEmails: receiptEmailsEnabled,
+        });
       }
 
       resetAvatarSelection();
@@ -560,6 +586,37 @@ export default function AccountPage() {
                     value={session.user.email}
                   />
                 </label>
+
+                <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+                  <p className="text-xs uppercase tracking-[0.25em] text-white/45">Email preferences</p>
+                  <div className="mt-4 space-y-3">
+                    <label className="flex items-start gap-3 rounded-2xl border border-white/10 bg-black/20 p-4 text-sm text-white/65">
+                      <input
+                        checked={marketingEmailsEnabled}
+                        className="mt-1 h-4 w-4 rounded border-white/20 bg-black/20 text-red-600"
+                        onChange={(event) => setMarketingEmailsEnabled(event.target.checked)}
+                        type="checkbox"
+                      />
+                      <span>
+                        <span className="block font-medium text-white">Promotions and movie offers</span>
+                        <span className="mt-1 block">Get member promos, announcements, and limited-time campaign emails.</span>
+                      </span>
+                    </label>
+
+                    <label className="flex items-start gap-3 rounded-2xl border border-white/10 bg-black/20 p-4 text-sm text-white/65">
+                      <input
+                        checked={receiptEmailsEnabled}
+                        className="mt-1 h-4 w-4 rounded border-white/20 bg-black/20 text-red-600"
+                        onChange={(event) => setReceiptEmailsEnabled(event.target.checked)}
+                        type="checkbox"
+                      />
+                      <span>
+                        <span className="block font-medium text-white">Email my receipts</span>
+                        <span className="mt-1 block">Send payment confirmations and ticket receipt details to this account email.</span>
+                      </span>
+                    </label>
+                  </div>
+                </div>
 
                 <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
                   <div className="flex items-center justify-between gap-3">
@@ -838,7 +895,7 @@ export default function AccountPage() {
                   Account note
                 </div>
                 <p className="mt-3 text-sm leading-6 text-white/60">
-                  Profile edits now cover stored avatar uploads and password changes. The remaining obvious extensions here are notification preferences and connected auth providers.
+                  Profile edits now cover stored avatar uploads, password changes, and email delivery preferences for promotions and receipts.
                 </p>
               </div>
             </div>

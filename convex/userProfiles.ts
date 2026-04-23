@@ -1,6 +1,9 @@
 import { v } from "convex/values";
-import { mutation, query, type MutationCtx, type QueryCtx } from "./_generated/server";
+import { internal } from "./_generated/api";
+import { internalAction, mutation, query, type MutationCtx, type QueryCtx } from "./_generated/server";
 import { authComponent } from "./auth";
+import { sendAppEmail } from "../lib/email";
+import { getAppUrl } from "../lib/stripe";
 import {
   STAFF_ROLES,
   buildStaffAccessSummary,
@@ -54,6 +57,49 @@ export const getMyProfile = query({
     return {
       avatarUrl: profile?.avatarUrl ?? null,
       hasStoredAvatar: Boolean(profile?.avatarStorageId),
+      marketingEmails: profile?.marketingEmails ?? false,
+      receiptEmails: profile?.receiptEmails ?? true,
+    };
+  },
+});
+
+export const updateEmailPreferences = mutation({
+  args: {
+    marketingEmails: v.boolean(),
+    receiptEmails: v.boolean(),
+  },
+  handler: async (ctx, args) => {
+    const currentUser = await getCurrentUserOrThrow(ctx);
+    const existingProfile = await ctx.db
+      .query("userProfiles")
+      .withIndex("userId", (query) => query.eq("userId", currentUser._id))
+      .unique();
+    const now = Date.now();
+    const normalizedEmail = currentUser.email
+      ? normalizeStaffEmail(currentUser.email)
+      : existingProfile?.email;
+
+    if (existingProfile) {
+      await ctx.db.patch(existingProfile._id, {
+        email: normalizedEmail,
+        marketingEmails: args.marketingEmails,
+        receiptEmails: args.receiptEmails,
+        updatedAt: now,
+      });
+    } else {
+      await ctx.db.insert("userProfiles", {
+        userId: currentUser._id,
+        email: normalizedEmail,
+        marketingEmails: args.marketingEmails,
+        receiptEmails: args.receiptEmails,
+        createdAt: now,
+        updatedAt: now,
+      });
+    }
+
+    return {
+      marketingEmails: args.marketingEmails,
+      receiptEmails: args.receiptEmails,
     };
   },
 });
@@ -219,6 +265,88 @@ export const setTicketScannerStaffAccess = mutation({
   },
 });
 
+export const sendPromotionalEmailCampaign = mutation({
+  args: {
+    subject: v.string(),
+    message: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const currentUser = await getCurrentUserOrThrow(ctx);
+    const access = await getTicketScannerAccessSummary(ctx, currentUser);
+
+    if (!access.canManageStaff) {
+      throw new Error("You do not have permission to send promotional emails.");
+    }
+
+    const subject = args.subject.trim();
+    const message = args.message.trim();
+
+    if (subject.length < 3) {
+      throw new Error("Enter a longer email subject.");
+    }
+
+    if (message.length < 10) {
+      throw new Error("Enter a short promotional message before sending.");
+    }
+
+    const recipients = (await ctx.db.query("userProfiles").collect())
+      .filter((profile) => profile.marketingEmails === true && Boolean(profile.email))
+      .map((profile) => profile.email!)
+      .filter((email, index, values) => values.indexOf(email) === index);
+
+    if (recipients.length === 0) {
+      throw new Error("No members have opted in to promotional emails yet.");
+    }
+
+    await ctx.scheduler.runAfter(0, internal.userProfiles.sendPromotionalEmailCampaignInternal, {
+      recipients,
+      subject,
+      message,
+      senderName: currentUser.name ?? currentUser.email ?? "QuickShow",
+    });
+
+    return { queuedCount: recipients.length };
+  },
+});
+
+export const sendPromotionalEmailCampaignInternal = internalAction({
+  args: {
+    recipients: v.array(v.string()),
+    subject: v.string(),
+    message: v.string(),
+    senderName: v.optional(v.string()),
+  },
+  handler: async (_ctx, args) => {
+    const appUrl = getAppUrl();
+    const messageHtml = args.message.replace(/\n/g, "<br />");
+
+    const results = await Promise.all(
+      args.recipients.map((recipient) =>
+        sendAppEmail({
+          to: recipient,
+          subject: args.subject,
+          text: `${args.message}\n\nBrowse now: ${appUrl}/movies\n\nSent by ${args.senderName ?? "QuickShow"}`,
+          html: `
+            <div style="font-family:Arial,sans-serif;line-height:1.6;color:#111827;max-width:640px;margin:0 auto;">
+              <h2 style="margin-bottom:12px;">QuickShow Promotion</h2>
+              <p>${messageHtml}</p>
+              <p style="margin-top:20px;">
+                <a href="${appUrl}/movies" style="display:inline-block;background:#991b1b;color:#ffffff;text-decoration:none;padding:10px 16px;border-radius:999px;">Browse movies</a>
+              </p>
+              <p style="margin-top:20px;color:#6b7280;font-size:12px;">Sent by ${args.senderName ?? "QuickShow"} because this member opted in for promotional emails.</p>
+            </div>
+          `,
+        })
+      )
+    );
+
+    return {
+      queuedCount: args.recipients.length,
+      sentCount: results.filter((result) => result.delivered).length,
+    };
+  },
+});
+
 export const generateAvatarUploadUrl = mutation({
   args: {},
   handler: async (ctx) => {
@@ -266,6 +394,9 @@ export const commitAvatarUpload = mutation({
 
     if (existingProfile) {
       await ctx.db.patch(existingProfile._id, {
+        email: currentUser.email
+          ? normalizeStaffEmail(currentUser.email)
+          : existingProfile.email,
         avatarStorageId: args.storageId,
         avatarUrl: args.avatarUrl,
         updatedAt: now,
@@ -273,8 +404,11 @@ export const commitAvatarUpload = mutation({
     } else {
       await ctx.db.insert("userProfiles", {
         userId: currentUser._id,
+        email: currentUser.email ? normalizeStaffEmail(currentUser.email) : undefined,
         avatarStorageId: args.storageId,
         avatarUrl: args.avatarUrl,
+        marketingEmails: false,
+        receiptEmails: true,
         createdAt: now,
         updatedAt: now,
       });

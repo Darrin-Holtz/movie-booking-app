@@ -1,5 +1,8 @@
 import { v } from "convex/values";
 import Stripe from "stripe";
+import { sendAppEmail } from "../lib/email";
+import { getFoodAddOnsTotal, normalizeFoodAddOnSelections } from "../lib/foodAddOns";
+import { getAppUrl } from "../lib/stripe";
 import { getShowtimePrice } from "../lib/showtimePricing";
 import { internal } from "./_generated/api";
 import { Doc, Id } from "./_generated/dataModel";
@@ -18,6 +21,26 @@ import { authComponent } from "./auth";
 const PAYMENT_HOLD_DURATION_MS = 15 * 60 * 1000;
 const STRIPE_RECONCILIATION_DELAYS_MS = [60 * 1000, 5 * 60 * 1000, 14 * 60 * 1000];
 const SHOWTIME_TIME_ZONE = "America/New_York";
+
+const checkoutAddOnValidator = v.object({
+  id: v.union(v.literal("popcorn"), v.literal("soda"), v.literal("combo")),
+  quantity: v.number(),
+});
+
+const storedCheckoutAddOnValidator = v.object({
+  id: v.string(),
+  name: v.string(),
+  description: v.string(),
+  quantity: v.number(),
+  unitPrice: v.number(),
+  totalPrice: v.number(),
+});
+
+const formatCurrency = (amount: number, currency = "usd") =>
+  new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: currency.toUpperCase(),
+  }).format(amount);
 
 const createTicketCode = () => {
   return `QS-${crypto.randomUUID().replace(/-/g, "").slice(0, 8).toUpperCase()}`;
@@ -211,12 +234,30 @@ const finalizeCheckout = async (
     items: completedItems,
   });
 
+  if (checkout.sendReceiptEmail !== false && checkout.customerEmail) {
+    await ctx.scheduler.runAfter(0, internal.payments.sendCheckoutReceiptEmail, {
+      toEmail: checkout.customerEmail,
+      customerName: checkout.customerName,
+      totalPrice: checkout.totalPrice,
+      currency: checkout.currency,
+      items: completedItems.map((item) => ({
+        movieTitle: item.movieTitle,
+        date: item.date,
+        time: item.time,
+        seatLabels: item.seatLabels,
+        ticketCode: item.ticketCode,
+      })),
+      addOns: checkout.addOns ?? [],
+    });
+  }
+
   return { status: "completed" as const };
 };
 
 export const prepareCheckout = mutation({
   args: {
     bookingIds: v.array(v.id("showSessions")),
+    addOns: v.optional(v.array(checkoutAddOnValidator)),
   },
   handler: async (ctx, args) => {
     const user = await authComponent.safeGetAuthUser(ctx);
@@ -233,6 +274,10 @@ export const prepareCheckout = mutation({
 
     const now = Date.now();
     const expiresAt = now + PAYMENT_HOLD_DURATION_MS;
+    const userProfile = await ctx.db
+      .query("userProfiles")
+      .withIndex("userId", (query) => query.eq("userId", user._id))
+      .unique();
     const items: Doc<"paymentCheckouts">["items"] = [];
 
     for (const bookingId of uniqueBookingIds) {
@@ -294,15 +339,22 @@ export const prepareCheckout = mutation({
       });
     }
 
-    const totalPrice = items.reduce((sum, item) => sum + item.totalPrice, 0);
+    const addOns = normalizeFoodAddOnSelections(args.addOns);
+    const addOnsTotal = getFoodAddOnsTotal(addOns);
+    const totalPrice = items.reduce((sum, item) => sum + item.totalPrice, 0) + addOnsTotal;
     const seatCount = items.reduce((sum, item) => sum + item.seatLabels.length, 0);
 
     const checkoutId = await ctx.db.insert("paymentCheckouts", {
       userId: user._id,
+      customerEmail: user.email ?? undefined,
+      customerName: user.name ?? undefined,
+      sendReceiptEmail: userProfile?.receiptEmails ?? true,
       status: "pending",
       currency: "usd",
       seatCount,
       totalPrice,
+      addOnsTotal,
+      addOns,
       expiresAt,
       items,
       createdAt: now,
@@ -315,6 +367,8 @@ export const prepareCheckout = mutation({
       currency: "usd",
       expiresAt,
       items,
+      addOns,
+      addOnsTotal,
       totalPrice,
     };
   },
@@ -719,6 +773,58 @@ export const reconcileStripeCheckout: ReturnType<typeof internalAction> = intern
       console.error("Stripe reconciliation failed.", error);
       return { status: "error" as const };
     }
+  },
+});
+
+export const sendCheckoutReceiptEmail: ReturnType<typeof internalAction> = internalAction({
+  args: {
+    toEmail: v.string(),
+    customerName: v.optional(v.string()),
+    totalPrice: v.number(),
+    currency: v.string(),
+    items: v.array(
+      v.object({
+        movieTitle: v.string(),
+        date: v.string(),
+        time: v.string(),
+        seatLabels: v.array(v.string()),
+        ticketCode: v.optional(v.string()),
+      })
+    ),
+    addOns: v.optional(v.array(storedCheckoutAddOnValidator)),
+  },
+  handler: async (_ctx, args) => {
+    const appUrl = getAppUrl();
+    const ticketLines = args.items
+      .map(
+        (item) =>
+          `<li><strong>${item.movieTitle}</strong> — ${item.date} at ${item.time} • Seats ${item.seatLabels.join(", ")}${item.ticketCode ? ` • Ticket ${item.ticketCode}` : ""}</li>`
+      )
+      .join("");
+    const addOnLines = (args.addOns ?? [])
+      .map((item) => `<li>${item.quantity} × ${item.name} — ${formatCurrency(item.totalPrice, args.currency)}</li>`)
+      .join("");
+
+    await sendAppEmail({
+      to: args.toEmail,
+      subject: "Your QuickShow receipt",
+      text: `Thanks${args.customerName ? ` ${args.customerName}` : ""}! Your QuickShow payment is confirmed. Total: ${formatCurrency(args.totalPrice, args.currency)}. View your bookings at ${appUrl}/my-bookings`,
+      html: `
+        <div style="font-family:Arial,sans-serif;line-height:1.6;color:#111827;max-width:680px;margin:0 auto;">
+          <h2 style="margin-bottom:12px;">Your QuickShow receipt</h2>
+          <p>Thanks${args.customerName ? ` ${args.customerName}` : ""}! Your payment is confirmed.</p>
+          <p><strong>Total paid:</strong> ${formatCurrency(args.totalPrice, args.currency)}</p>
+          <h3 style="margin-top:20px;">Tickets</h3>
+          <ul>${ticketLines}</ul>
+          ${addOnLines ? `<h3 style="margin-top:20px;">Refreshments</h3><ul>${addOnLines}</ul>` : ""}
+          <p style="margin-top:20px;">
+            <a href="${appUrl}/my-bookings" style="display:inline-block;background:#991b1b;color:#ffffff;text-decoration:none;padding:10px 16px;border-radius:999px;">Open my bookings</a>
+          </p>
+        </div>
+      `,
+    });
+
+    return { delivered: true as const };
   },
 });
 

@@ -10,6 +10,7 @@ import {
   CameraIcon,
   CheckCircle2Icon,
   LoaderCircleIcon,
+  MailIcon,
   PlusIcon,
   SearchIcon,
   ShieldAlertIcon,
@@ -223,8 +224,11 @@ export default function StaffDashboardPage() {
   const [searchDate, setSearchDate] = useState("");
   const [attendanceDate, setAttendanceDate] = useState("");
   const [attendanceSearchInput, setAttendanceSearchInput] = useState("");
+  const [promoSubjectInput, setPromoSubjectInput] = useState("This week at QuickShow");
+  const [promoMessageInput, setPromoMessageInput] = useState("Thanks for being a QuickShow member. Check the latest movies and special offers this week.");
   const [isUpdatingTicketStaff, setIsUpdatingTicketStaff] = useState(false);
   const [isSavingTheatre, setIsSavingTheatre] = useState(false);
+  const [isSendingPromoEmail, setIsSendingPromoEmail] = useState(false);
   const [roleDrafts, setRoleDrafts] = useState<Record<string, StaffRole>>({});
   const [theatreDrafts, setTheatreDrafts] = useState<Record<string, TheatreDraft>>({});
   const [newTheatreDraft, setNewTheatreDraft] = useState<TheatreDraft>(emptyTheatreDraft);
@@ -271,6 +275,7 @@ export default function StaffDashboardPage() {
   ) as ManagedTheatre[] | undefined;
   const claimInitialTicketScannerAccess = useMutation(api.userProfiles.claimInitialTicketScannerAccess);
   const setTicketScannerStaffAccess = useMutation(api.userProfiles.setTicketScannerStaffAccess);
+  const sendPromotionalEmailCampaign = useMutation(api.userProfiles.sendPromotionalEmailCampaign);
   const saveManagedTheatre = useMutation(api.showSessions.saveManagedTheatre);
 
   useEffect(() => {
@@ -363,6 +368,27 @@ export default function StaffDashboardPage() {
       toast.error(error instanceof Error ? error.message : "Unable to remove staff access.");
     } finally {
       setIsUpdatingTicketStaff(false);
+    }
+  };
+
+  const handleSendPromotionalEmail = async () => {
+    const subject = promoSubjectInput.trim();
+    const message = promoMessageInput.trim();
+
+    if (!subject || !message) {
+      toast.error("Enter both a promo subject and message.");
+      return;
+    }
+
+    setIsSendingPromoEmail(true);
+
+    try {
+      const result = await sendPromotionalEmailCampaign({ subject, message });
+      toast.success(`Promotion queued for ${result.queuedCount} member${result.queuedCount === 1 ? "" : "s"}.`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Unable to send the promotional email.");
+    } finally {
+      setIsSendingPromoEmail(false);
     }
   };
 
@@ -481,12 +507,14 @@ export default function StaffDashboardPage() {
     );
   }
 
+  const isLookupActive = deferredLookupValue.length >= 2 || searchStatus !== "all" || Boolean(searchDate);
+  const isSearchLoading = Boolean(ticketScannerAccess?.canLookupTickets && isLookupActive && searchResults === undefined);
+  const isAttendanceLoading = Boolean(ticketScannerAccess?.canViewAttendance && attendanceOverview === undefined);
+
   if (
     ticketScannerAccess === undefined ||
     ((ticketScannerAccess.canManageStaff || ticketScannerAccess.canBootstrap) && ticketScannerStaff === undefined) ||
-    (ticketScannerAccess.canLookupTickets && (deferredLookupValue.length >= 2 || searchStatus !== "all" || Boolean(searchDate)) && searchResults === undefined) ||
     (ticketScannerAccess.canViewRecentCheckIns && recentCheckIns === undefined) ||
-    (ticketScannerAccess.canViewAttendance && attendanceOverview === undefined) ||
     (ticketScannerAccess.canManageTheatres && managedTheatres === undefined)
   ) {
     return <Loading />;
@@ -649,14 +677,18 @@ export default function StaffDashboardPage() {
               <div className="flex items-center justify-between gap-3">
                 <p className="text-xs uppercase tracking-[0.25em] text-white/45">Search results</p>
                 <p className="text-xs text-white/45">
-                  {deferredLookupValue.length >= 2 || searchStatus !== "all" || Boolean(searchDate)
+                  {isLookupActive
                     ? `${visibleSearchResults.length} match${visibleSearchResults.length === 1 ? "" : "es"}`
                     : "Add a search or filter to begin"}
                 </p>
               </div>
 
-              {deferredLookupValue.length >= 2 || searchStatus !== "all" || Boolean(searchDate) ? (
-                visibleSearchResults.length > 0 ? (
+              {isLookupActive ? (
+                isSearchLoading ? (
+                  <div className="rounded-2xl border border-dashed border-white/10 bg-black/10 p-5 text-sm text-white/55">
+                    Searching tickets…
+                  </div>
+                ) : visibleSearchResults.length > 0 ? (
                   <div className="grid gap-4">
                     {visibleSearchResults.map((record) => (
                       <article
@@ -800,7 +832,11 @@ export default function StaffDashboardPage() {
             </div>
 
             <div className="mt-6 grid gap-4 lg:grid-cols-2">
-              {visibleAttendance.length > 0 ? (
+              {isAttendanceLoading ? (
+                <div className="rounded-2xl border border-dashed border-white/10 bg-black/10 p-5 text-sm text-white/55">
+                  Updating attendance…
+                </div>
+              ) : visibleAttendance.length > 0 ? (
                 visibleAttendance.map((record) => (
                   <article key={record.sessionId} className="rounded-2xl border border-white/10 bg-black/20 p-5">
                     <div className="flex items-start justify-between gap-4">
@@ -871,6 +907,43 @@ export default function StaffDashboardPage() {
                 <p className="mt-2">Controls the full team and can edit theatre details plus default showtimes for future sessions.</p>
               </div>
             </div>
+
+            {ticketScannerAccess.canManageStaff ? (
+              <div className="mt-6 rounded-2xl border border-white/10 bg-black/20 p-4">
+                <div className="flex items-center gap-2">
+                  <MailIcon className="h-4 w-4 text-red-300" />
+                  <p className="text-xs uppercase tracking-[0.25em] text-white/45">Member promotions</p>
+                </div>
+                <p className="mt-3 text-sm leading-6 text-white/60">
+                  Send a promo email to members who opted in from their account page. Receipt emails are sent automatically after paid checkout.
+                </p>
+                <div className="mt-4 space-y-3">
+                  <input
+                    type="text"
+                    value={promoSubjectInput}
+                    onChange={(event) => setPromoSubjectInput(event.target.value)}
+                    placeholder="Promo subject"
+                    className="w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white outline-none transition focus:border-red-500"
+                  />
+                  <textarea
+                    value={promoMessageInput}
+                    onChange={(event) => setPromoMessageInput(event.target.value)}
+                    rows={5}
+                    placeholder="Write your member promotion"
+                    className="w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white outline-none transition focus:border-red-500"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleSendPromotionalEmail}
+                    disabled={isSendingPromoEmail}
+                    className="inline-flex items-center gap-2 rounded-full bg-red-800 px-5 py-3 text-sm font-medium text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {isSendingPromoEmail ? <LoaderCircleIcon className="h-4 w-4 animate-spin" /> : <MailIcon className="h-4 w-4" />}
+                    {isSendingPromoEmail ? "Sending..." : "Send promo email"}
+                  </button>
+                </div>
+              </div>
+            ) : null}
           </article>
 
           <article className="rounded-3xl border border-white/10 bg-white/5 p-6 shadow-xl shadow-black/25 backdrop-blur-xl">
