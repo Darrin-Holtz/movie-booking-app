@@ -148,7 +148,7 @@ const Navbar = () => {
             <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 rounded-full border border-white/10 bg-black/45 px-4 py-3 shadow-2xl shadow-black/25 backdrop-blur-xl md:px-6">
                 <Link href="/" className="min-w-0 flex-1 xl:flex-none">
                     <div className="text-3xl font-bold leading-none">
-                        Quick<span className="text-red-800">Show</span>
+                        Quick<span className="text-red-500">Show</span>
                     </div>
                 </Link>
 

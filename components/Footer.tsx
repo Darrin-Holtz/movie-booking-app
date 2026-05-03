@@ -8,7 +8,7 @@ const Footer = () => {
           <div className="md:max-w-96">
               <Link href="/" className="max-xl:flex-1">
                 <div className="text-3xl font-bold">
-                    Quick<span className="text-red-800">Show</span>
+                    Quick<span className="text-red-500">Show</span>
                 </div>
             </Link>
               <p className="mt-6 text-sm">
@@ -23,10 +23,10 @@ const Footer = () => {
               <div>
                   <h2 className="font-semibold mb-5">Company</h2>
                   <ul className="text-sm space-y-2">
-                      <li><a href="#">Home</a></li>
-                      <li><a href="#">About us</a></li>
-                      <li><a href="#">Contact us</a></li>
-                      <li><a href="#">Privacy policy</a></li>
+                      <li><Link href="/">Home</Link></li>
+                      <li><Link href="/movies">Browse Movies</Link></li>
+                      <li><Link href="/my-bookings">My Bookings</Link></li>
+                      <li><Link href="/account">Account</Link></li>
                   </ul>
               </div>
               <div>
