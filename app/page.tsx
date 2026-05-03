@@ -4,6 +4,23 @@ import { HeroSection } from "@/components/HeroSection";
 import TrailersSection from "@/components/TrailersSection";
 import { getPopularTrailers } from "@/lib/tmdb";
 
+const siteUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+
+const websiteSchema = {
+  "@context": "https://schema.org",
+  "@type": "WebSite",
+  name: "QuickShow",
+  url: siteUrl,
+  potentialAction: {
+    "@type": "SearchAction",
+    target: {
+      "@type": "EntryPoint",
+      urlTemplate: `${siteUrl}/movies?q={search_term_string}&mode=search`,
+    },
+    "query-input": "required name=search_term_string",
+  },
+};
+
 async function HomeTrailersSection() {
   const trailers = await getPopularTrailers();
 
@@ -38,6 +55,12 @@ export default function HomePage() {
 
   return (
     <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify(websiteSchema).replace(/<\/script>/gi, "<\\/script>"),
+        }}
+      />
       <Suspense fallback={<HeroFallback />}>
         <HeroSection />
       </Suspense>

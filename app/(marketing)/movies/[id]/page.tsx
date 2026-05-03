@@ -234,6 +234,32 @@ const MovieDetails = () => {
 
     return (
         <>
+            {show && (
+                <script
+                    type="application/ld+json"
+                    dangerouslySetInnerHTML={{
+                        __html: JSON.stringify({
+                            "@context": "https://schema.org",
+                            "@type": "Movie",
+                            name: show.movie.title,
+                            description: show.movie.overview,
+                            image: show.movie.poster_path
+                                ? `https://image.tmdb.org/t/p/w500${show.movie.poster_path}`
+                                : undefined,
+                            datePublished: show.movie.release_date,
+                            genre: show.movie.genres.map((g) => g.name),
+                            aggregateRating: show.movie.vote_average > 0
+                                ? {
+                                    "@type": "AggregateRating",
+                                    ratingValue: show.movie.vote_average.toFixed(1),
+                                    bestRating: "10",
+                                    worstRating: "0",
+                                  }
+                                : undefined,
+                        }).replace(/<\/script>/gi, "<\\/script>"),
+                    }}
+                />
+            )}
             <div className="px-6 md:px-16 lg:px-40 pt-30 md:pt-50">
                 <div className="flex flex-col md:flex-row gap-8 max-w-6xl mx-auto">
                     <Image
