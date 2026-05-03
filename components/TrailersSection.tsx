@@ -19,7 +19,7 @@ const getYoutubeEmbedUrl = (videoUrl: string) => {
       return null;
     }
 
-    return `https://www.youtube-nocookie.com/embed/${videoId}?rel=0&modestbranding=1&playsinline=1`;
+    return `https://www.youtube-nocookie.com/embed/${videoId}?rel=0&modestbranding=1&playsinline=1&autoplay=1`;
   } catch {
     return null;
   }
@@ -27,8 +27,14 @@ const getYoutubeEmbedUrl = (videoUrl: string) => {
 
 const TrailersSection = ({ trailers }: TrailersSectionProps) => {
   const [currentTrailerIndex, setCurrentTrailerIndex] = useState(0);
+  const [isPlaying, setIsPlaying] = useState(false);
   const activeTrailer = trailers[Math.min(currentTrailerIndex, Math.max(trailers.length - 1, 0))] ?? null;
   const activeTrailerEmbedUrl = activeTrailer ? getYoutubeEmbedUrl(activeTrailer.videoUrl) : null;
+
+  const handleSelectTrailer = (index: number) => {
+    setCurrentTrailerIndex(index);
+    setIsPlaying(false);
+  };
 
   return (
     <div className="px-6 md:px-16 lg:px-24 xl:px-44 py-20 overflow-hidden">
@@ -38,15 +44,37 @@ const TrailersSection = ({ trailers }: TrailersSectionProps) => {
         {activeTrailer && activeTrailerEmbedUrl ? (
           <div className="mx-auto w-full max-w-3xl overflow-hidden rounded-xl bg-black">
             <div className="relative aspect-video w-full">
-              <iframe
-                key={activeTrailer.id}
-                src={activeTrailerEmbedUrl}
-                title={`${activeTrailer.title} trailer`}
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                allowFullScreen
-                className="absolute inset-0 h-full w-full border-0"
-                referrerPolicy="strict-origin-when-cross-origin"
-              />
+              {isPlaying ? (
+                <iframe
+                  key={activeTrailer.id}
+                  src={activeTrailerEmbedUrl}
+                  title={`${activeTrailer.title} trailer`}
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                  allowFullScreen
+                  className="absolute inset-0 h-full w-full border-0"
+                  referrerPolicy="strict-origin-when-cross-origin"
+                />
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setIsPlaying(true)}
+                  className="group absolute inset-0 h-full w-full"
+                  aria-label={`Play ${activeTrailer.title} trailer`}
+                >
+                  <Image
+                    src={activeTrailer.image}
+                    alt={activeTrailer.title}
+                    fill
+                    sizes="(max-width: 768px) 100vw, 768px"
+                    className="object-cover brightness-75"
+                  />
+                  <span className="absolute inset-0 flex items-center justify-center">
+                    <span className="flex h-16 w-16 items-center justify-center rounded-full bg-black/60 backdrop-blur-sm transition group-hover:bg-red-700/80">
+                      <PlayCircleIcon strokeWidth={1.4} className="h-10 w-10 text-white" />
+                    </span>
+                  </span>
+                </button>
+              )}
             </div>
           </div>
         ) : (
@@ -60,7 +88,7 @@ const TrailersSection = ({ trailers }: TrailersSectionProps) => {
             className={`relative cursor-pointer transition duration-300 hover:-translate-y-1 max-md:h-60 md:max-h-60 ${
               currentTrailerIndex === index ? "ring-2 ring-red-500" : "group-hover:not-hover:opacity-50"
             }`}
-            onClick={() => setCurrentTrailerIndex(index)}
+            onClick={() => handleSelectTrailer(index)}
           >
             <Image
               src={trailer.image}
