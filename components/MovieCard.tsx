@@ -103,8 +103,9 @@ const MovieCard = ({ movie }: MovieCardProps) => {
               : `https://image.tmdb.org/t/p/w780${movie.backdrop_path}`
             : "/fallback-movie.jpg"}
           alt={movie.title}
-          width={320}
-          height={180}
+          width={240}
+          height={135}
+          sizes="(max-width: 640px) calc(100vw - 80px), 240px"
           className="cursor-pointer rounded-lg object-cover object-bottom-right"
         />
       </Link>

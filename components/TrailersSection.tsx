@@ -93,8 +93,9 @@ const TrailersSection = ({ trailers }: TrailersSectionProps) => {
             <Image
               src={trailer.image}
               alt={trailer.title}
-              width={320}
-              height={180}
+              width={160}
+              height={90}
+              sizes="(max-width: 768px) 22vw, 168px"
               className="h-full w-full rounded-lg object-cover brightness-75"
             />
             <PlayCircleIcon strokeWidth={1.6} className="absolute top-1/2 left-1/2 h-5 w-5 -translate-x-1/2 -translate-y-1/2 transform md:h-12 md:w-8" />
