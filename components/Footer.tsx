@@ -15,8 +15,8 @@ const Footer = () => {
                   This website uses the TMDb API but is not endorsed or certified by TMDb. All movie, TV, and person data is provided by The Movie Database (TMDb).
               </p>
               <div className="flex items-center gap-2 mt-4">
-                  <Image src="https://raw.githubusercontent.com/prebuiltui/prebuiltui/refs/heads/main/assets/appDownload/googlePlayBtnBlack.svg" alt="google play" width={135} height={40} className="h-10 w-auto border border-white rounded" />
-                  <Image src="https://raw.githubusercontent.com/prebuiltui/prebuiltui/refs/heads/main/assets/appDownload/appleStoreBtnBlack.svg" alt="app store" width={135} height={40} className="h-10 w-auto border border-white rounded" />
+                  <Image src="/googlePlayBtnBlack.svg" alt="google play" width={135} height={40} className="h-10 w-auto border border-white rounded" />
+                  <Image src="/appleStoreBtnBlack.svg" alt="app store" width={135} height={40} className="h-10 w-auto border border-white rounded" />
               </div>
           </div>
           <div className="flex-1 flex items-start md:justify-end gap-20 md:gap-40">

@@ -9,10 +9,6 @@ const nextConfig: NextConfig = {
       },
       {
         protocol: "https",
-        hostname: "raw.githubusercontent.com",
-      },
-      {
-        protocol: "https",
         hostname: "lovable-rooster-474.convex.cloud",
       },
     ],
