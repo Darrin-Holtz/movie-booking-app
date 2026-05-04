@@ -80,7 +80,7 @@ export const HeroSection = async () => {
           className="object-cover object-center"
         />
       )}
-      <div className="absolute inset-0 bg-linear-to-r from-black/75 via-black/40 to-black/10" />
+      <div className="absolute inset-0 bg-linear-to-r from-black/50 via-black/25 to-black/5 opacity-10" />
       <div className="relative z-10 flex flex-col items-start gap-4 px-6 md:px-16 lg:px-30">
         <h1 className="text-5xl md:text-[70px] md:leading-18 font-semibold max-w-110">
           {movie.title}

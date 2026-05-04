@@ -99,6 +99,9 @@ const TrailersSection = ({ trailers }: TrailersSectionProps) => {
               className="h-full w-full rounded-lg object-cover brightness-75"
             />
             <PlayCircleIcon strokeWidth={1.6} className="absolute top-1/2 left-1/2 h-5 w-5 -translate-x-1/2 -translate-y-1/2 transform md:h-12 md:w-8" />
+            <span className="absolute bottom-0 left-0 right-0 rounded-b-lg bg-gradient-to-t from-black/80 to-transparent px-2 py-1 text-xs font-medium text-white line-clamp-2">
+              {trailer.title}
+            </span>
           </div>
         ))}
       </div>
